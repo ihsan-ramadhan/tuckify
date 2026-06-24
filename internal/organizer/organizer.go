@@ -1,6 +1,8 @@
 package organizer
 
 import (
+	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -12,6 +14,17 @@ type Result struct {
 	Destination string
 	Skipped     bool
 	SkipReason  string
+}
+
+func MoveFile(src, destDir string) (string, error) {
+	if err := os.MkdirAll(destDir, 0o755); err != nil {
+		return "", fmt.Errorf("create destination: %w", err)
+	}
+	dest := filepath.Join(destDir, filepath.Base(src))
+	if err := os.Rename(src, dest); err != nil {
+		return "", fmt.Errorf("move file: %w", err)
+	}
+	return dest, nil
 }
 
 func MatchRule(filename string, rules []config.Rule) *config.Rule {
