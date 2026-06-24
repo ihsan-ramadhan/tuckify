@@ -1,0 +1,66 @@
+# rules.example.toml
+# Copy this file to ~/.tuck/rules.toml and adjust to your needs.
+#
+# Rules are executed top to bottom.
+# Each file matches the first rule that fits — no multiple matches.
+# Extension matching is case-insensitive (.PDF == .pdf).
+
+[settings]
+# Strategy when a file with the same name already exists at the destination.
+# "rename"    → append suffix _1, _2, etc. (default)
+# "skip"      → leave the file, do not move
+# "overwrite" → replace the existing file
+conflict_strategy = "rename"
+
+# --- Documents ---
+
+[[rule]]
+name        = "PDF"
+extensions  = [".pdf"]
+destination = "~/Documents/PDF"
+
+[[rule]]
+name        = "Word & spreadsheet"
+extensions  = [".doc", ".docx", ".xls", ".xlsx", ".pptx"]
+destination = "~/Documents/Office"
+
+[[rule]]
+name        = "Plain text"
+extensions  = [".txt", ".md", ".csv"]
+destination = "~/Documents/Text"
+
+# --- Images ---
+
+[[rule]]
+name        = "Photos"
+extensions  = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic"]
+destination = "~/Pictures/Sorted"
+
+[[rule]]
+name        = "Design"
+extensions  = [".psd", ".ai", ".figma", ".svg", ".xcf"]
+destination = "~/Pictures/Design"
+
+# --- Video & Audio ---
+
+[[rule]]
+name        = "Video"
+extensions  = [".mp4", ".mkv", ".avi", ".mov", ".webm"]
+destination = "~/Videos"
+
+[[rule]]
+name        = "Audio"
+extensions  = [".mp3", ".wav", ".flac", ".aac", ".ogg"]
+destination = "~/Music"
+
+# --- Downloads ---
+
+[[rule]]
+name        = "Archives"
+extensions  = [".zip", ".tar", ".gz", ".rar", ".7z"]
+destination = "~/Downloads/Archives"
+
+[[rule]]
+name        = "Installers"
+extensions  = [".exe", ".dmg", ".deb", ".rpm", ".pkg", ".msi", ".appimage"]
+destination = "~/Downloads/Installers"
