@@ -69,3 +69,55 @@ func MoveFile(src, destDir, conflictStrategy string) (string, error) {
 	}
 	return dest, nil
 }
+
+func Organize(folder string, cfg *config.Config, dryRun bool) ([]Result, error) {
+	entries, err := os.ReadDir(folder)
+	if err != nil {
+		return nil, fmt.Errorf("read folder: %w", err)
+	}
+
+	var results []Result
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		rule := MatchRule(name, cfg.Rules)
+		if rule == nil {
+			continue
+		}
+
+		src := filepath.Join(folder, name)
+
+		if f, err := os.Open(src); err != nil {
+			results = append(results, Result{
+				Source:     src,
+				Skipped:    true,
+				SkipReason: fmt.Sprintf("cannot open: %v", err),
+			})
+			continue
+		} else {
+			f.Close()
+		}
+
+		if dryRun {
+			results = append(results, Result{
+				Source:      src,
+				Destination: filepath.Join(rule.Destination, name),
+			})
+			continue
+		}
+
+		dest, err := MoveFile(src, rule.Destination, cfg.Settings.ConflictStrategy)
+		if err != nil {
+			results = append(results, Result{
+				Source:     src,
+				Skipped:    true,
+				SkipReason: err.Error(),
+			})
+			continue
+		}
+		results = append(results, Result{Source: src, Destination: dest})
+	}
+	return results, nil
+}
