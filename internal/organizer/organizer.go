@@ -16,17 +16,6 @@ type Result struct {
 	SkipReason  string
 }
 
-func MoveFile(src, destDir string) (string, error) {
-	if err := os.MkdirAll(destDir, 0o755); err != nil {
-		return "", fmt.Errorf("create destination: %w", err)
-	}
-	dest := filepath.Join(destDir, filepath.Base(src))
-	if err := os.Rename(src, dest); err != nil {
-		return "", fmt.Errorf("move file: %w", err)
-	}
-	return dest, nil
-}
-
 func MatchRule(filename string, rules []config.Rule) *config.Rule {
 	ext := strings.ToLower(filepath.Ext(filename))
 	if ext == "" {
@@ -40,4 +29,43 @@ func MatchRule(filename string, rules []config.Rule) *config.Rule {
 		}
 	}
 	return nil
+}
+
+func resolveDest(destDir, filename, strategy string) (string, error) {
+	dest := filepath.Join(destDir, filename)
+	if _, err := os.Stat(dest); os.IsNotExist(err) {
+		return dest, nil
+	}
+	switch strategy {
+	case "skip":
+		return "", nil
+	case "overwrite":
+		return dest, nil
+	default:
+		ext := filepath.Ext(filename)
+		base := strings.TrimSuffix(filename, ext)
+		for i := 1; ; i++ {
+			candidate := filepath.Join(destDir, fmt.Sprintf("%s_%d%s", base, i, ext))
+			if _, err := os.Stat(candidate); os.IsNotExist(err) {
+				return candidate, nil
+			}
+		}
+	}
+}
+
+func MoveFile(src, destDir, conflictStrategy string) (string, error) {
+	if err := os.MkdirAll(destDir, 0o755); err != nil {
+		return "", fmt.Errorf("create destination: %w", err)
+	}
+	dest, err := resolveDest(destDir, filepath.Base(src), conflictStrategy)
+	if err != nil {
+		return "", err
+	}
+	if dest == "" {
+		return "", nil
+	}
+	if err := os.Rename(src, dest); err != nil {
+		return "", fmt.Errorf("move file: %w", err)
+	}
+	return dest, nil
 }
