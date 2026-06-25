@@ -3,6 +3,7 @@ package service
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 )
 
@@ -51,6 +52,16 @@ WantedBy=default.target
 		return fmt.Errorf("write systemd service file: %w", err)
 	}
 
+	cmdReload := exec.Command("systemctl", "--user", "daemon-reload")
+	if err := cmdReload.Run(); err != nil {
+		return fmt.Errorf("systemd daemon-reload: %w", err)
+	}
+
+	cmdEnable := exec.Command("systemctl", "--user", "enable", "--now", "tuckify")
+	if err := cmdEnable.Run(); err != nil {
+		return fmt.Errorf("enable and start tuckify service: %w", err)
+	}
+
 	return nil
 }
 
@@ -61,9 +72,18 @@ func (s *SystemdService) Uninstall() error {
 	}
 
 	servicePath := filepath.Join(home, ".config/systemd/user/tuckify.service")
+
+	if _, err := os.Stat(servicePath); err == nil {
+		cmdDisable := exec.Command("systemctl", "--user", "disable", "--now", "tuckify")
+		_ = cmdDisable.Run()
+	}
+
 	if err := os.Remove(servicePath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("remove service file: %w", err)
 	}
+
+	cmdReload := exec.Command("systemctl", "--user", "daemon-reload")
+	_ = cmdReload.Run()
 
 	return nil
 }
@@ -85,5 +105,5 @@ func (s *SystemdService) Exists() (bool, error) {
 }
 
 func (s *SystemdService) CheckStatus() (string, error) {
-	return "", nil
+	return "To check status, run: systemctl --user status tuckify", nil
 }
