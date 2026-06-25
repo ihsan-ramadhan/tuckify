@@ -38,19 +38,29 @@ go build -o tuckify .
 
 **1. Create a config file at `~/.tuckify/rules.toml`:**
 
-You can copy the template from [rules.example.toml](rules.example.toml) as a starting point:
-
+### Linux & macOS
 ```bash
 mkdir -p ~/.tuckify
-cp rules.example.toml ~/.tuckify/rules.toml
+curl -fsSL https://raw.githubusercontent.com/ihsan-ramadhan/tuckify/main/rules.example.toml -o ~/.tuckify/rules.toml
 ```
 
-*(On Windows, create the folder `%USERPROFILE%\.tuckify` and save the configuration as `rules.toml` inside it).*
+### Windows (PowerShell)
+```powershell
+New-Item -ItemType Directory -Path "$HOME\.tuckify" -Force
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/ihsan-ramadhan/tuckify/main/rules.example.toml" -OutFile "$HOME\.tuckify\rules.toml"
+```
+
+### Windows (CMD)
+```cmd
+mkdir %USERPROFILE%\.tuckify
+curl -fsSL https://raw.githubusercontent.com/ihsan-ramadhan/tuckify/main/rules.example.toml -o %USERPROFILE%\.tuckify\rules.toml
+```
 
 **2. Run:**
 
+### Linux & macOS
 ```bash
-# organize once
+# organize once (replace ~/Downloads with your target folder path)
 tuckify run ~/Downloads
 
 # preview without moving files
@@ -61,6 +71,21 @@ tuckify schedule ~/Downloads --cron "0 9 * * *"
 
 # register as a startup service
 tuckify init ~/Downloads --cron "0 9 * * *"
+```
+
+### Windows (PowerShell & CMD)
+```powershell
+# organize once (replace "$HOME\Downloads" with your target folder path)
+tuckify run "$HOME\Downloads"
+
+# preview without moving files
+tuckify run "$HOME\Downloads" --dry-run
+
+# run on a schedule (long-running process)
+tuckify schedule "$HOME\Downloads" --cron "0 9 * * *"
+
+# register as a startup service
+tuckify init "$HOME\Downloads" --cron "0 9 * * *"
 ```
 
 ---
