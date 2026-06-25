@@ -1,4 +1,4 @@
-module github.com/ihsan-ramadhan/tuck
+module github.com/ihsan-ramadhan/tuckify
 
 go 1.26.4
 

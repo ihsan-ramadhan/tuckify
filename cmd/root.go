@@ -4,13 +4,13 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/ihsan-ramadhan/tuck/internal/config"
+	"github.com/ihsan-ramadhan/tuckify/internal/config"
 )
 
 var configPath string
 
 var rootCmd = &cobra.Command{
-	Use:   "tuck",
+	Use:   "tuckify",
 	Short: "Automatic file organizer",
 }
 

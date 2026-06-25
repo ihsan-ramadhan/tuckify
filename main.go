@@ -1,6 +1,6 @@
 package main
 
-import "github.com/ihsan-ramadhan/tuck/cmd"
+import "github.com/ihsan-ramadhan/tuckify/cmd"
 
 func main() {
 	cmd.Execute()

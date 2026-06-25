@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ihsan-ramadhan/tuck/internal/config"
+	"github.com/ihsan-ramadhan/tuckify/internal/config"
 )
 
 func makeConfig(strategy string, rules ...config.Rule) *config.Config {

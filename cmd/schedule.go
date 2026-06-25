@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ihsan-ramadhan/tuck/internal/config"
-	"github.com/ihsan-ramadhan/tuck/internal/scheduler"
+	"github.com/ihsan-ramadhan/tuckify/internal/config"
+	"github.com/ihsan-ramadhan/tuckify/internal/scheduler"
 	"github.com/spf13/cobra"
 )
 
