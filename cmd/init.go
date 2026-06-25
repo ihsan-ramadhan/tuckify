@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/ihsan-ramadhan/tuckify/internal/service"
+	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 )
 
@@ -28,6 +30,25 @@ var initCmd = &cobra.Command{
 		srv, err := service.NewService()
 		if err != nil {
 			return err
+		}
+
+		exists, err := srv.Exists()
+		if err != nil {
+			return fmt.Errorf("check service existence: %w", err)
+		}
+
+		if exists {
+			fd := os.Stdout.Fd()
+			if isatty.IsTerminal(fd) || isatty.IsCygwinTerminal(fd) {
+				fmt.Print("Service 'tuckify' already exists. Overwrite? [y/N]: ")
+				var response string
+				_, _ = fmt.Scanln(&response)
+				response = strings.ToLower(strings.TrimSpace(response))
+				if response != "y" && response != "yes" {
+					fmt.Println("Installation aborted.")
+					return nil
+				}
+			}
 		}
 
 		var customConfigPath string
