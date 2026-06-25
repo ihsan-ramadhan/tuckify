@@ -10,8 +10,9 @@ import (
 var configPath string
 
 var rootCmd = &cobra.Command{
-	Use:   "tuckify",
-	Short: "Automatic file organizer",
+	Use:     "tuckify",
+	Short:   "Automatic file organizer",
+	Version: "0.1.0",
 }
 
 func Execute() {
