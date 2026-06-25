@@ -98,4 +98,66 @@ WantedBy=default.target
 	}
 }
 
+func TestLaunchdContent(t *testing.T) {
+	binary := "/usr/bin/tuckify"
+	folder := "/data"
+	cronExpr := "0 9 * * *"
+	cfgPath := "/etc/tuckify.toml"
+
+	content := buildLaunchdContent(binary, folder, cronExpr, cfgPath)
+	expected := `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.ihsan.tuckify</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/tuckify</string>
+        <string>schedule</string>
+        <string>/data</string>
+        <string>--cron</string>
+        <string>0 9 * * *</string>
+        <string>--config</string>
+        <string>/etc/tuckify.toml</string>
+    </array>
+    <key>KeepAlive</key>
+    <true/>
+    <key>RunAtLoad</key>
+    <true/>
+</dict>
+</plist>
+`
+	if content != expected {
+		t.Errorf("expected %q, got %q", expected, content)
+	}
+
+	contentNoCfg := buildLaunchdContent(binary, folder, cronExpr, "")
+	expectedNoCfg := `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.ihsan.tuckify</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/tuckify</string>
+        <string>schedule</string>
+        <string>/data</string>
+        <string>--cron</string>
+        <string>0 9 * * *</string>
+    </array>
+    <key>KeepAlive</key>
+    <true/>
+    <key>RunAtLoad</key>
+    <true/>
+</dict>
+</plist>
+`
+	if contentNoCfg != expectedNoCfg {
+		t.Errorf("expected %q, got %q", expectedNoCfg, contentNoCfg)
+	}
+}
+
+
 
