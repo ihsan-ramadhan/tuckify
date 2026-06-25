@@ -6,13 +6,15 @@ import (
 	"os/exec"
 )
 
+const schtasksCmd = "schtasks"
+
 type WintaskService struct{}
 
 func NewWintaskService() *WintaskService {
 	return &WintaskService{}
 }
 
-func (w *WintaskService) Install(folder string, cronExpr string, configPath string) error {
+func (w *WintaskService) Install(folder, cronExpr, configPath string) error {
 	binaryPath, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("get executable path: %w", err)
@@ -20,7 +22,12 @@ func (w *WintaskService) Install(folder string, cronExpr string, configPath stri
 
 	execCmd := buildWintaskCmd(binaryPath, folder, cronExpr, configPath)
 
-	cmd := exec.Command("schtasks", "/create", "/tn", "tuckify", "/tr", execCmd, "/sc", "onlogon", "/f")
+	winSch, err := exec.LookPath(schtasksCmd)
+	if err != nil {
+		return fmt.Errorf("find schtasks: %w", err)
+	}
+
+	cmd := exec.Command(winSch, "/create", "/tn", "tuckify", "/tr", execCmd, "/sc", "onlogon", "/f")
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("create scheduled task: %w", err)
 	}
@@ -29,13 +36,23 @@ func (w *WintaskService) Install(folder string, cronExpr string, configPath stri
 }
 
 func (w *WintaskService) Uninstall() error {
-	cmd := exec.Command("schtasks", "/delete", "/tn", "tuckify", "/f")
+	winSch, err := exec.LookPath(schtasksCmd)
+	if err != nil {
+		return fmt.Errorf("find schtasks: %w", err)
+	}
+
+	cmd := exec.Command(winSch, "/delete", "/tn", "tuckify", "/f")
 	_ = cmd.Run()
 	return nil
 }
 
 func (w *WintaskService) Exists() (bool, error) {
-	cmd := exec.Command("schtasks", "/query", "/tn", "tuckify")
+	winSch, err := exec.LookPath(schtasksCmd)
+	if err != nil {
+		return false, fmt.Errorf("find schtasks: %w", err)
+	}
+
+	cmd := exec.Command(winSch, "/query", "/tn", "tuckify")
 	if err := cmd.Run(); err != nil {
 		return false, nil
 	}

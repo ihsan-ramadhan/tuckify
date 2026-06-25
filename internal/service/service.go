@@ -7,7 +7,7 @@ import (
 )
 
 type Service interface {
-	Install(folder string, cronExpr string, configPath string) error
+	Install(folder, cronExpr, configPath string) error
 	Uninstall() error
 	Exists() (bool, error)
 	CheckStatus() (string, error)

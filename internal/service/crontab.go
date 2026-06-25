@@ -8,13 +8,18 @@ import (
 	"strings"
 )
 
+const (
+	crontabCmd        = "crontab"
+	tuckifyManagedTag = "# tuckify-managed"
+)
+
 type CrontabService struct{}
 
 func NewCrontabService() *CrontabService {
 	return &CrontabService{}
 }
 
-func (c *CrontabService) Install(folder string, cronExpr string, configPath string) error {
+func (c *CrontabService) Install(folder, cronExpr, configPath string) error {
 	binaryPath, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("get executable path: %w", err)
@@ -46,7 +51,11 @@ func (c *CrontabService) Uninstall() error {
 	}
 
 	if strings.TrimSpace(newContent) == "" {
-		cmd := exec.Command("crontab", "-r")
+		cronPath, err := exec.LookPath(crontabCmd)
+		if err != nil {
+			return fmt.Errorf("find crontab: %w", err)
+		}
+		cmd := exec.Command(cronPath, "-r")
 		_ = cmd.Run()
 		return nil
 	}
@@ -63,7 +72,7 @@ func (c *CrontabService) Exists() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return strings.Contains(curr, "# tuckify-managed"), nil
+	return strings.Contains(curr, tuckifyManagedTag), nil
 }
 
 func (c *CrontabService) CheckStatus() (string, error) {
@@ -71,7 +80,11 @@ func (c *CrontabService) CheckStatus() (string, error) {
 }
 
 func (c *CrontabService) readCrontab() (string, error) {
-	cmd := exec.Command("crontab", "-l")
+	cronPath, err := exec.LookPath(crontabCmd)
+	if err != nil {
+		return "", fmt.Errorf("find crontab: %w", err)
+	}
+	cmd := exec.Command(cronPath, "-l")
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	_ = cmd.Run()
@@ -79,7 +92,11 @@ func (c *CrontabService) readCrontab() (string, error) {
 }
 
 func (c *CrontabService) writeCrontab(content string) error {
-	cmd := exec.Command("crontab", "-")
+	cronPath, err := exec.LookPath(crontabCmd)
+	if err != nil {
+		return fmt.Errorf("find crontab: %w", err)
+	}
+	cmd := exec.Command(cronPath, "-")
 	cmd.Stdin = strings.NewReader(content)
 	var errOut bytes.Buffer
 	cmd.Stderr = &errOut
@@ -94,7 +111,7 @@ func updateCrontabContent(currCrontab, binaryPath, folder, cronExpr, configPath 
 	var newLines []string
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		if trimmed == "" || strings.Contains(trimmed, "# tuckify-managed") {
+		if trimmed == "" || strings.Contains(trimmed, tuckifyManagedTag) {
 			continue
 		}
 		newLines = append(newLines, line)
@@ -104,7 +121,7 @@ func updateCrontabContent(currCrontab, binaryPath, folder, cronExpr, configPath 
 	if configPath != "" {
 		cronCmd += fmt.Sprintf(" --config %s", configPath)
 	}
-	cronCmd += " # tuckify-managed"
+	cronCmd += " " + tuckifyManagedTag
 
 	newLine := fmt.Sprintf("%s %s", cronExpr, cronCmd)
 	newLines = append(newLines, newLine)
@@ -118,7 +135,7 @@ func removeCrontabContent(currCrontab string) (string, bool) {
 	hasManaged := false
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		if strings.Contains(trimmed, "# tuckify-managed") {
+		if strings.Contains(trimmed, tuckifyManagedTag) {
 			hasManaged = true
 			continue
 		}

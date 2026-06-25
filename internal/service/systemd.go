@@ -7,13 +7,19 @@ import (
 	"path/filepath"
 )
 
+const (
+	systemctlCmd       = "systemctl"
+	systemdUserFlag    = "--user"
+	systemdServicePath = ".config/systemd/user/tuckify.service"
+)
+
 type SystemdService struct{}
 
 func NewSystemdService() *SystemdService {
 	return &SystemdService{}
 }
 
-func (s *SystemdService) Install(folder string, cronExpr string, configPath string) error {
+func (s *SystemdService) Install(folder, cronExpr, configPath string) error {
 	binaryPath, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("get executable path: %w", err)
@@ -24,7 +30,7 @@ func (s *SystemdService) Install(folder string, cronExpr string, configPath stri
 		return fmt.Errorf("get home directory: %w", err)
 	}
 
-	servicePath := filepath.Join(home, ".config/systemd/user/tuckify.service")
+	servicePath := filepath.Join(home, systemdServicePath)
 	serviceDir := filepath.Dir(servicePath)
 	if err := os.MkdirAll(serviceDir, 0o755); err != nil {
 		return fmt.Errorf("create systemd directory: %w", err)
@@ -36,12 +42,17 @@ func (s *SystemdService) Install(folder string, cronExpr string, configPath stri
 		return fmt.Errorf("write systemd service file: %w", err)
 	}
 
-	cmdReload := exec.Command("systemctl", "--user", "daemon-reload")
+	sysctl, err := exec.LookPath(systemctlCmd)
+	if err != nil {
+		return fmt.Errorf("find systemctl: %w", err)
+	}
+
+	cmdReload := exec.Command(sysctl, systemdUserFlag, "daemon-reload")
 	if err := cmdReload.Run(); err != nil {
 		return fmt.Errorf("systemd daemon-reload: %w", err)
 	}
 
-	cmdEnable := exec.Command("systemctl", "--user", "enable", "--now", "tuckify")
+	cmdEnable := exec.Command(sysctl, systemdUserFlag, "enable", "--now", "tuckify")
 	if err := cmdEnable.Run(); err != nil {
 		return fmt.Errorf("enable and start tuckify service: %w", err)
 	}
@@ -55,10 +66,15 @@ func (s *SystemdService) Uninstall() error {
 		return fmt.Errorf("get home directory: %w", err)
 	}
 
-	servicePath := filepath.Join(home, ".config/systemd/user/tuckify.service")
+	servicePath := filepath.Join(home, systemdServicePath)
+
+	sysctl, err := exec.LookPath(systemctlCmd)
+	if err != nil {
+		return fmt.Errorf("find systemctl: %w", err)
+	}
 
 	if _, err := os.Stat(servicePath); err == nil {
-		cmdDisable := exec.Command("systemctl", "--user", "disable", "--now", "tuckify")
+		cmdDisable := exec.Command(sysctl, systemdUserFlag, "disable", "--now", "tuckify")
 		_ = cmdDisable.Run()
 	}
 
@@ -66,7 +82,7 @@ func (s *SystemdService) Uninstall() error {
 		return fmt.Errorf("remove service file: %w", err)
 	}
 
-	cmdReload := exec.Command("systemctl", "--user", "daemon-reload")
+	cmdReload := exec.Command(sysctl, systemdUserFlag, "daemon-reload")
 	_ = cmdReload.Run()
 
 	return nil
@@ -77,7 +93,7 @@ func (s *SystemdService) Exists() (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("get home directory: %w", err)
 	}
-	servicePath := filepath.Join(home, ".config/systemd/user/tuckify.service")
+	servicePath := filepath.Join(home, systemdServicePath)
 	_, err = os.Stat(servicePath)
 	if err == nil {
 		return true, nil
