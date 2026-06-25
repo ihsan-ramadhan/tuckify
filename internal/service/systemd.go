@@ -30,23 +30,7 @@ func (s *SystemdService) Install(folder string, cronExpr string, configPath stri
 		return fmt.Errorf("create systemd directory: %w", err)
 	}
 
-	execStart := fmt.Sprintf("%s schedule %s --cron %q", binaryPath, folder, cronExpr)
-	if configPath != "" {
-		execStart += fmt.Sprintf(" --config %s", configPath)
-	}
-
-	content := fmt.Sprintf(`[Unit]
-Description=tuckify file organizer
-After=default.target
-
-[Service]
-ExecStart=%s
-Restart=on-failure
-RestartSec=5s
-
-[Install]
-WantedBy=default.target
-`, execStart)
+	content := buildSystemdContent(binaryPath, folder, cronExpr, configPath)
 
 	if err := os.WriteFile(servicePath, []byte(content), 0o644); err != nil {
 		return fmt.Errorf("write systemd service file: %w", err)
@@ -106,4 +90,24 @@ func (s *SystemdService) Exists() (bool, error) {
 
 func (s *SystemdService) CheckStatus() (string, error) {
 	return "To check status, run: systemctl --user status tuckify", nil
+}
+
+func buildSystemdContent(binaryPath, folder, cronExpr, configPath string) string {
+	execStart := fmt.Sprintf("%s schedule %s --cron %q", binaryPath, folder, cronExpr)
+	if configPath != "" {
+		execStart += fmt.Sprintf(" --config %s", configPath)
+	}
+
+	return fmt.Sprintf(`[Unit]
+Description=tuckify file organizer
+After=default.target
+
+[Service]
+ExecStart=%s
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=default.target
+`, execStart)
 }

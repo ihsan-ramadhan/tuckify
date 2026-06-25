@@ -28,3 +28,74 @@ func TestNewService(t *testing.T) {
 		}
 	}
 }
+
+func TestCrontabContentUpdate(t *testing.T) {
+	initial := "* * * * * old-job\n"
+	binary := "/usr/bin/tuckify"
+	folder := "/data"
+	cronExpr := "0 9 * * *"
+	cfgPath := "/etc/tuckify.toml"
+
+	updated := updateCrontabContent(initial, binary, folder, cronExpr, cfgPath)
+	expected := "* * * * * old-job\n0 9 * * * /usr/bin/tuckify run /data --config /etc/tuckify.toml # tuckify-managed\n"
+	if updated != expected {
+		t.Errorf("expected %q, got %q", expected, updated)
+	}
+	
+	updatedNoCfg := updateCrontabContent(initial, binary, folder, cronExpr, "")
+	expectedNoCfg := "* * * * * old-job\n0 9 * * * /usr/bin/tuckify run /data # tuckify-managed\n"
+	if updatedNoCfg != expectedNoCfg {
+		t.Errorf("expected %q, got %q", expectedNoCfg, updatedNoCfg)
+	}
+
+	removed, ok := removeCrontabContent(updated)
+	if !ok {
+		t.Error("expected remove to return ok=true")
+	}
+	if removed != initial {
+		t.Errorf("expected %q, got %q", initial, removed)
+	}
+}
+
+func TestSystemdContent(t *testing.T) {
+	binary := "/usr/bin/tuckify"
+	folder := "/data"
+	cronExpr := "0 9 * * *"
+	cfgPath := "/etc/tuckify.toml"
+
+	content := buildSystemdContent(binary, folder, cronExpr, cfgPath)
+	expected := `[Unit]
+Description=tuckify file organizer
+After=default.target
+
+[Service]
+ExecStart=/usr/bin/tuckify schedule /data --cron "0 9 * * *" --config /etc/tuckify.toml
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=default.target
+`
+	if content != expected {
+		t.Errorf("expected %q, got %q", expected, content)
+	}
+
+	contentNoCfg := buildSystemdContent(binary, folder, cronExpr, "")
+	expectedNoCfg := `[Unit]
+Description=tuckify file organizer
+After=default.target
+
+[Service]
+ExecStart=/usr/bin/tuckify schedule /data --cron "0 9 * * *"
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=default.target
+`
+	if contentNoCfg != expectedNoCfg {
+		t.Errorf("expected %q, got %q", expectedNoCfg, contentNoCfg)
+	}
+}
+
+
