@@ -159,5 +159,29 @@ func TestLaunchdContent(t *testing.T) {
 	}
 }
 
+func TestWintaskCmd(t *testing.T) {
+	binary := `C:\tuckify.exe`
+	folder := `C:\data`
+	cronExpr := "0 9 * * *"
+	cfgPath := `C:\config.toml`
+
+	cmd := buildWintaskCmd(binary, folder, cronExpr, cfgPath)
+	expected := `""C:\tuckify.exe" schedule "C:\data" --cron "0 9 * * *"" --config "C:\config.toml"`
+	// Note: Windows path might have quotes, let's verify our build helper formatting.
+	// In wintask.go: fmt.Sprintf(`"%s" schedule "%s" --cron "%s"`, binaryPath, folder, cronExpr)
+	// So expected: `"C:\tuckify.exe" schedule "C:\data" --cron "0 9 * * *"" --config "C:\config.toml"`
+	expected = `"` + binary + `" schedule "` + folder + `" --cron "` + cronExpr + `"` + ` --config "` + cfgPath + `"`
+	if cmd != expected {
+		t.Errorf("expected %q, got %q", expected, cmd)
+	}
+
+	cmdNoCfg := buildWintaskCmd(binary, folder, cronExpr, "")
+	expectedNoCfg := `"` + binary + `" schedule "` + folder + `" --cron "` + cronExpr + `"`
+	if cmdNoCfg != expectedNoCfg {
+		t.Errorf("expected %q, got %q", expectedNoCfg, cmdNoCfg)
+	}
+}
+
+
 
 
