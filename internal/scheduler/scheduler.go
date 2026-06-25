@@ -7,8 +7,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ihsan-ramadhan/tuck/internal/config"
-	"github.com/ihsan-ramadhan/tuck/internal/organizer"
+	"github.com/ihsan-ramadhan/tuckify/internal/config"
+	"github.com/ihsan-ramadhan/tuckify/internal/organizer"
 	"github.com/robfig/cron/v3"
 )
 

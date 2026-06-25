@@ -1,5 +1,5 @@
 # rules.example.toml
-# Copy this file to ~/.tuck/rules.toml and adjust to your needs.
+# Copy this file to ~/.tuckify/rules.toml and adjust to your needs.
 #
 # Rules are executed top to bottom.
 # Each file matches the first rule that fits — no multiple matches.

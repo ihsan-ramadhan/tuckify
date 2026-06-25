@@ -27,7 +27,7 @@ type Rule struct {
 }
 
 func DefaultConfigPath() string {
-	return ExpandHome("~/.tuck/rules.toml")
+	return ExpandHome("~/.tuckify/rules.toml")
 }
 
 func Load(path string) (*Config, error) {

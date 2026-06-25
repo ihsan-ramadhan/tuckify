@@ -5,8 +5,8 @@ import (
 	"os"
 
 	"github.com/fatih/color"
-	"github.com/ihsan-ramadhan/tuck/internal/config"
-	"github.com/ihsan-ramadhan/tuck/internal/organizer"
+	"github.com/ihsan-ramadhan/tuckify/internal/config"
+	"github.com/ihsan-ramadhan/tuckify/internal/organizer"
 	"github.com/spf13/cobra"
 )
 

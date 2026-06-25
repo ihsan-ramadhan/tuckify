@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/ihsan-ramadhan/tuck/internal/config"
+	"github.com/ihsan-ramadhan/tuckify/internal/config"
 )
 
 type Result struct {
