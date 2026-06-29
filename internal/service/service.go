@@ -45,8 +45,10 @@ func NewService() (Service, error) {
 			return NewSystemdService(), nil
 		}
 		return NewCrontabService(), nil
-	case "darwin", "windows":
-		return &placeholderService{os: runtime.GOOS}, nil
+	case "darwin":
+		return NewLaunchdService(), nil
+	case "windows":
+		return NewWintaskService(), nil
 	default:
 		return nil, fmt.Errorf("unsupported operating system: %s", runtime.GOOS)
 	}

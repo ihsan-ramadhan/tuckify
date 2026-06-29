@@ -85,7 +85,7 @@ func TestLaunchdContent(t *testing.T) {
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.ihsan.tuckify</string>
+    <string>com.ihsan.tuckify.downloads</string>
     <key>ProgramArguments</key>
     <array>
         <string>/usr/bin/tuckify</string>
@@ -114,7 +114,7 @@ func TestLaunchdContent(t *testing.T) {
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.ihsan.tuckify</string>
+    <string>com.ihsan.tuckify.downloads</string>
     <key>ProgramArguments</key>
     <array>
         <string>/usr/bin/tuckify</string>
