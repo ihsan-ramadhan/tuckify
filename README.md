@@ -1,8 +1,12 @@
+<div align="center">
+
 # tuckify
 
-> automatic file organizer with scheduling — cross-platform CLI
+**Your Downloads folder is a graveyard. tuckify cleans it automatically.**
 
-tuckify organizes files in a folder based on rules you define. Run it once, schedule it, or register it as a startup service.
+Organize files by rule, schedule it, manage multiple folders — without touching them again.
+
+</div>
 
 ---
 
@@ -14,13 +18,13 @@ tuckify organizes files in a folder based on rules you define. Run it once, sche
 curl -fsSL https://raw.githubusercontent.com/ihsan-ramadhan/tuckify/main/install.sh | sh
 ```
 
-Installs the binary to `~/.local/bin/tuckify`. Make sure `~/.local/bin` is in your `PATH`.
+Installs to `~/.local/bin/tuckify`. Make sure `~/.local/bin` is in your `PATH`.
 
 ### Windows
 
-1. Download the latest `tuckify-windows-amd64.exe` from the [Releases](https://github.com/ihsan-ramadhan/tuckify/releases) page.
-2. Rename the binary to `tuckify.exe`.
-3. Add the folder containing `tuckify.exe` to your system's `PATH` environment variable.
+1. Download `tuckify-windows-amd64.exe` from [Releases](https://github.com/ihsan-ramadhan/tuckify/releases)
+2. Rename to `tuckify.exe`
+3. Add its folder to your `PATH`
 
 ### Build from source
 
@@ -36,56 +40,37 @@ go build -o tuckify .
 
 ## Quick Start
 
-**1. Create a config file at `~/.tuckify/rules.toml`:**
+**1. Create a config at `~/.tuckify/rules.toml`:**
 
-### Linux & macOS
 ```bash
+# Linux & macOS
 mkdir -p ~/.tuckify
 curl -fsSL https://raw.githubusercontent.com/ihsan-ramadhan/tuckify/main/rules.example.toml -o ~/.tuckify/rules.toml
 ```
 
-### Windows (PowerShell)
 ```powershell
+# Windows (PowerShell)
 New-Item -ItemType Directory -Path "$HOME\.tuckify" -Force
 Invoke-WebRequest -Uri "https://raw.githubusercontent.com/ihsan-ramadhan/tuckify/main/rules.example.toml" -OutFile "$HOME\.tuckify\rules.toml"
 ```
 
-### Windows (CMD)
-```cmd
-mkdir %USERPROFILE%\.tuckify
-curl -fsSL https://raw.githubusercontent.com/ihsan-ramadhan/tuckify/main/rules.example.toml -o %USERPROFILE%\.tuckify\rules.toml
-```
-
 **2. Run:**
 
-### Linux & macOS
 ```bash
-# organize once (replace ~/Downloads with your target folder path)
+# organize once
 tuckify run ~/Downloads
 
 # preview without moving files
 tuckify run ~/Downloads --dry-run
 
-# run on a schedule (long-running process)
-tuckify schedule ~/Downloads --cron "0 9 * * *"
+# schedule it (saves to list + runs interactively)
+tuckify schedule downloads ~/Downloads --cron "0 9 * * *"
 
-# register as a startup service
-tuckify init ~/Downloads --cron "0 9 * * *"
-```
+# activate as a background service
+tuckify start downloads
 
-### Windows (PowerShell & CMD)
-```powershell
-# organize once (replace "$HOME\Downloads" with your target folder path)
-tuckify run "$HOME\Downloads"
-
-# preview without moving files
-tuckify run "$HOME\Downloads" --dry-run
-
-# run on a schedule (long-running process)
-tuckify schedule "$HOME\Downloads" --cron "0 9 * * *"
-
-# register as a startup service
-tuckify init "$HOME\Downloads" --cron "0 9 * * *"
+# check status
+tuckify list
 ```
 
 ---
@@ -93,13 +78,15 @@ tuckify init "$HOME\Downloads" --cron "0 9 * * *"
 ## Usage
 
 ```
-tuckify run <folder> [--config <path>] [--dry-run]
-tuckify schedule <folder> --cron "<expr>" [--config <path>]
-tuckify init <folder> --cron "<expr>" [--config <path>]
-tuckify uninit
+tuckify run <folder> [--dry-run] [--config <path>]
+tuckify schedule <name> <folder> --cron "<expr>" [--config <path>]
+tuckify list
+tuckify start <name>
+tuckify stop <name>
+tuckify delete <name>
+tuckify startup
+tuckify unstartup
 tuckify uninstall
-tuckify --help
-tuckify --version
 ```
 
 ### Commands
@@ -107,10 +94,35 @@ tuckify --version
 | Command | Description |
 |---|---|
 | `run` | Organize files once |
-| `schedule` | Run organizer on a cron schedule (stays running) |
-| `init` | Register tuckify as a startup service (systemd/launchd/schtasks) |
-| `uninit` | Remove tuckify from startup |
-| `uninstall` | Remove binary, service, and optionally config |
+| `schedule` | Save a named schedule and run it interactively |
+| `list` | Show all saved schedules and their status |
+| `start` | Activate a saved schedule as a background service |
+| `stop` | Deactivate a service (keeps it in the list) |
+| `delete` | Remove a schedule from the list and stop its service |
+| `startup` | Install all saved schedules as system services (survives reboot) |
+| `unstartup` | Remove all tuckify system services |
+| `uninstall` | Remove binary, services, and optionally config |
+
+### Workflow
+
+```
+# 1. define a schedule (auto-saved to list)
+tuckify schedule downloads ~/Downloads --cron "0 9 * * *"
+
+# 2. activate it
+tuckify start downloads
+
+# 3. check
+tuckify list
+# NAME                 STATUS     CRON            FOLDER
+# downloads            online     0 9 * * *       /home/user/Downloads
+
+# 4. survive reboots
+tuckify startup
+
+# 5. remove
+tuckify delete downloads
+```
 
 ### Cron Expression
 
@@ -148,10 +160,10 @@ destination = "~/Documents"
 
 ### Behavior
 
-- Rules execute **top to bottom**, file matches the **first rule only**
+- Rules run **top to bottom**, file matches **first rule only**
 - Extension matching is **case-insensitive** (`.PDF` == `.pdf`)
 - Missing destination folders are created automatically
-- Default conflict strategy `rename`: appends suffix `_1`, `_2`, etc.
+- Default conflict strategy `rename`: appends `_1`, `_2`, etc.
 
 ---
 
@@ -161,7 +173,7 @@ destination = "~/Documents"
 tuckify uninstall
 ```
 
-Removes the binary and service. Prompts whether to also delete `~/.tuckify/`.
+Removes the binary and services. Prompts whether to also delete `~/.tuckify/`.
 
 ---
 

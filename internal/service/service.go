@@ -7,9 +7,9 @@ import (
 )
 
 type Service interface {
-	Install(folder, cronExpr, configPath string) error
-	Uninstall() error
-	Exists() (bool, error)
+	Install(name, folder, cronExpr, configPath string) error
+	Uninstall(name string) error // "" = remove all
+	Exists(name string) (bool, error)
 	CheckStatus() (string, error)
 }
 
@@ -17,15 +17,15 @@ type placeholderService struct {
 	os string
 }
 
-func (p *placeholderService) Install(folder string, cronExpr string, configPath string) error {
+func (p *placeholderService) Install(name, folder, cronExpr, configPath string) error {
 	return fmt.Errorf("not implemented for %s", p.os)
 }
 
-func (p *placeholderService) Uninstall() error {
+func (p *placeholderService) Uninstall(name string) error {
 	return fmt.Errorf("not implemented for %s", p.os)
 }
 
-func (p *placeholderService) Exists() (bool, error) {
+func (p *placeholderService) Exists(name string) (bool, error) {
 	return false, nil
 }
 
