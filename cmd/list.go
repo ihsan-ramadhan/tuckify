@@ -27,14 +27,35 @@ var listCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Printf("%-20s %-10s %-15s %s\n", "NAME", "STATUS", "CRON", "FOLDER")
+		fmt.Printf("%-20s %-10s %-8s %-15s %s\n", "NAME", "STATUS", "SAVED", "CRON", "FOLDER")
+
+		var unsaved []string
 		for _, s := range schedules {
+			online, _ := srv.Exists(s.Name)
+
 			status := "offline"
-			if online, _ := srv.Exists(s.Name); online {
+			saved := "no"
+
+			if online {
 				status = "online"
+				saved = "yes"
 			}
-			fmt.Printf("%-20s %-10s %-15s %s\n", s.Name, status, s.Cron, s.Folder)
+
+			fmt.Printf("%-20s %-10s %-8s %-15s %s\n", s.Name, status, saved, s.Cron, s.Folder)
+
+			if !online {
+				unsaved = append(unsaved, s.Name)
+			}
 		}
+
+		if len(unsaved) > 0 {
+			fmt.Println()
+			for _, name := range unsaved {
+				fmt.Printf("  ! %q not active — run 'tuckify start %s'\n", name, name)
+			}
+			fmt.Println("  To activate all at once: tuckify startup")
+		}
+
 		return nil
 	},
 }
