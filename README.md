@@ -63,11 +63,14 @@ tuckify run ~/Downloads
 # preview without moving files
 tuckify run ~/Downloads --dry-run
 
-# schedule it (saves to list + runs interactively)
+# save a schedule
 tuckify schedule downloads ~/Downloads --cron "0 9 * * *"
 
 # activate as a background service
 tuckify start downloads
+
+# or save + test interactively in one command
+tuckify schedule downloads ~/Downloads --cron "0 9 * * *" --run
 
 # check status
 tuckify list
@@ -79,7 +82,7 @@ tuckify list
 
 ```
 tuckify run <folder> [--dry-run] [--config <path>]
-tuckify schedule <name> <folder> --cron "<expr>" [--config <path>]
+tuckify schedule <name> <folder> --cron "<expr>" [--run] [--config <path>]
 tuckify list
 tuckify start <name>
 tuckify stop <name>
@@ -96,7 +99,7 @@ tuckify uninstall
 | Command | Description |
 |---|---|
 | `run` | Organize files once |
-| `schedule` | Save a named schedule and run it interactively |
+| `schedule` | Save a named schedule (`--run` to also start interactively) |
 | `list` | Show all saved schedules and their status |
 | `start` | Activate a saved schedule as a background service |
 | `stop` | Deactivate a service (keeps it in the list) |
@@ -110,10 +113,10 @@ tuckify uninstall
 ### Workflow
 
 ```
-# 1. define a schedule (auto-saved to list)
+# 1. save a schedule
 tuckify schedule downloads ~/Downloads --cron "0 9 * * *"
 
-# 2. activate it
+# 2. activate it as a background service
 tuckify start downloads
 
 # 3. check

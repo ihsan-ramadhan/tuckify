@@ -12,10 +12,11 @@ import (
 )
 
 var cronExpr string
+var scheduleRun bool
 
 var scheduleCmd = &cobra.Command{
 	Use:   "schedule <name> <folder>",
-	Short: "Run organizer on a cron schedule and save to list",
+	Short: "Save a named schedule (use --run to also start interactively)",
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
@@ -26,11 +27,6 @@ var scheduleCmd = &cobra.Command{
 
 		if _, err := os.Stat(folder); os.IsNotExist(err) {
 			return fmt.Errorf("folder not found: %s", folder)
-		}
-
-		cfg, err := config.Load(configPath)
-		if err != nil {
-			return err
 		}
 
 		var absConfig string
@@ -49,14 +45,25 @@ var scheduleCmd = &cobra.Command{
 		}); err != nil {
 			return fmt.Errorf("save schedule: %w", err)
 		}
-		fmt.Printf("saved schedule %q\n", name)
 
+		fmt.Printf("saved schedule %q\n", name)
+		fmt.Printf("  run 'tuckify start %s' to activate as a background service\n", name)
+
+		if !scheduleRun {
+			return nil
+		}
+
+		cfg, err := config.Load(configPath)
+		if err != nil {
+			return err
+		}
 		return scheduler.Run(folder, cronExpr, cfg)
 	},
 }
 
 func init() {
 	scheduleCmd.Flags().StringVar(&cronExpr, "cron", "", `cron expression, e.g. "0 9 * * *"`)
+	scheduleCmd.Flags().BoolVar(&scheduleRun, "run", false, "also start interactive scheduler after saving")
 	scheduleCmd.MarkFlagRequired("cron")
 	rootCmd.AddCommand(scheduleCmd)
 }
