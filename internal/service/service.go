@@ -11,6 +11,7 @@ type Service interface {
 	Uninstall(name string) error // "" = remove all
 	Exists(name string) (bool, error)
 	CheckStatus() (string, error)
+	Logs(name string, follow bool, lines int) error
 }
 
 type placeholderService struct {
@@ -31,6 +32,10 @@ func (p *placeholderService) Exists(name string) (bool, error) {
 
 func (p *placeholderService) CheckStatus() (string, error) {
 	return "", nil
+}
+
+func (p *placeholderService) Logs(name string, follow bool, lines int) error {
+	return fmt.Errorf("logs not implemented for %s", p.os)
 }
 
 func NewService() (Service, error) {

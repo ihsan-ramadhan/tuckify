@@ -128,6 +128,10 @@ func (c *CrontabService) CheckStatus() (string, error) {
 	return "Check crontab: crontab -l", nil
 }
 
+func (c *CrontabService) Logs(name string, follow bool, lines int) error {
+	return fmt.Errorf("logs not available for crontab-based schedules — check syslog or /var/log/syslog")
+}
+
 func (c *CrontabService) readCrontab() (string, error) {
 	cronPath, err := exec.LookPath(crontabCmd)
 	if err != nil {

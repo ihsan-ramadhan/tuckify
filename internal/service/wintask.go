@@ -68,6 +68,10 @@ func (w *WintaskService) CheckStatus() (string, error) {
 	return `To check status, run in cmd: schtasks /query /tn "tuckify-<name>"`, nil
 }
 
+func (w *WintaskService) Logs(name string, follow bool, lines int) error {
+	return fmt.Errorf("logs not available for Windows Task Scheduler — check Event Viewer")
+}
+
 func buildWintaskCmd(name, binaryPath, folder, cronExpr, configPath string) string {
 	execCmd := fmt.Sprintf(`"%s" schedule "%s" "%s" --cron "%s"`, binaryPath, name, folder, cronExpr)
 	if configPath != "" {

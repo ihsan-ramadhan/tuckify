@@ -93,6 +93,10 @@ func (l *LaunchdService) CheckStatus() (string, error) {
 	return "To check status, run: launchctl list | grep tuckify", nil
 }
 
+func (l *LaunchdService) Logs(name string, follow bool, lines int) error {
+	return fmt.Errorf("logs not available for launchd — check Console.app or ~/Library/Logs")
+}
+
 func buildLaunchdContent(name, binaryPath, folder, cronExpr, configPath string) string {
 	argsXml := fmt.Sprintf(`        <string>%s</string>
         <string>schedule</string>

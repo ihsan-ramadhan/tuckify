@@ -121,6 +121,23 @@ func (s *SystemdService) CheckStatus() (string, error) {
 	return "Check status: systemctl --user status tuckify-<name>", nil
 }
 
+func (s *SystemdService) Logs(name string, follow bool, lines int) error {
+	args := []string{"--user", "-u", "tuckify-" + name, "-n", fmt.Sprintf("%d", lines)}
+	if follow {
+		args = append(args, "-f")
+	}
+
+	jctl, err := exec.LookPath("journalctl")
+	if err != nil {
+		return fmt.Errorf("journalctl not found: %w", err)
+	}
+
+	cmd := exec.Command(jctl, args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
 func buildSystemdContent(name, binaryPath, folder, cronExpr, configPath string) string {
 	execStart := fmt.Sprintf("%s schedule %s %s --cron %q", binaryPath, name, folder, cronExpr)
 	if configPath != "" {

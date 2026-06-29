@@ -84,6 +84,7 @@ tuckify list
 tuckify start <name>
 tuckify stop <name>
 tuckify restart <name>
+tuckify logs <name> [-f] [-n <lines>]
 tuckify delete <name>
 tuckify startup
 tuckify unstartup
@@ -100,6 +101,7 @@ tuckify uninstall
 | `start` | Activate a saved schedule as a background service |
 | `stop` | Deactivate a service (keeps it in the list) |
 | `restart` | Stop then start a service (picks up config changes) |
+| `logs` | Show service logs (`-f` to follow, `-n` for line count) |
 | `delete` | Remove a schedule from the list and stop its service |
 | `startup` | Install all saved schedules as system services (survives reboot) |
 | `unstartup` | Remove all tuckify system services |
