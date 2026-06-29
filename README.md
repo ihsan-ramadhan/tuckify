@@ -83,6 +83,7 @@ tuckify schedule <name> <folder> --cron "<expr>" [--config <path>]
 tuckify list
 tuckify start <name>
 tuckify stop <name>
+tuckify restart <name>
 tuckify delete <name>
 tuckify startup
 tuckify unstartup
@@ -98,6 +99,7 @@ tuckify uninstall
 | `list` | Show all saved schedules and their status |
 | `start` | Activate a saved schedule as a background service |
 | `stop` | Deactivate a service (keeps it in the list) |
+| `restart` | Stop then start a service (picks up config changes) |
 | `delete` | Remove a schedule from the list and stop its service |
 | `startup` | Install all saved schedules as system services (survives reboot) |
 | `unstartup` | Remove all tuckify system services |
