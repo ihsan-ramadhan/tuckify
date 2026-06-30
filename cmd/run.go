@@ -27,6 +27,7 @@ var runCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		warnNoRules(cfg, configPath)
 
 		results, err := organizer.Organize(folder, cfg, dryRun)
 		if err != nil {

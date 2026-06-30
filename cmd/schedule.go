@@ -49,13 +49,14 @@ var scheduleCmd = &cobra.Command{
 		fmt.Printf("saved schedule %q\n", name)
 		fmt.Printf("  run 'tuckify start %s' to activate as a background service\n", name)
 
-		if !scheduleRun {
-			return nil
-		}
-
 		cfg, err := config.Load(configPath)
 		if err != nil {
 			return err
+		}
+		warnNoRules(cfg, configPath)
+
+		if !scheduleRun {
+			return nil
 		}
 		return scheduler.Run(folder, cronExpr, cfg)
 	},
