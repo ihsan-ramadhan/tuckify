@@ -122,7 +122,7 @@ func (s *SystemdService) CheckStatus() (string, error) {
 }
 
 func (s *SystemdService) Logs(name string, follow bool, lines int) error {
-	args := []string{"--user", "-u", "tuckify-" + name, "-n", fmt.Sprintf("%d", lines)}
+	args := []string{"--user", "-u", "tuckify-" + name, "-n", fmt.Sprintf("%d", lines), "-o", "short-monotonic"}
 	if follow {
 		args = append(args, "-f")
 	}
@@ -132,6 +132,7 @@ func (s *SystemdService) Logs(name string, follow bool, lines int) error {
 		return fmt.Errorf("journalctl not found: %w", err)
 	}
 
+	fmt.Printf("\033[1;34m==> logs: tuckify-%s\033[0m\n", name)
 	cmd := exec.Command(jctl, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

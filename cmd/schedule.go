@@ -8,6 +8,7 @@ import (
 	"github.com/ihsan-ramadhan/tuckify/internal/config"
 	"github.com/ihsan-ramadhan/tuckify/internal/scheduler"
 	"github.com/ihsan-ramadhan/tuckify/internal/store"
+	"github.com/robfig/cron/v3"
 	"github.com/spf13/cobra"
 )
 
@@ -27,6 +28,10 @@ var scheduleCmd = &cobra.Command{
 
 		if _, err := os.Stat(folder); os.IsNotExist(err) {
 			return fmt.Errorf("folder not found: %s", folder)
+		}
+
+		if _, err := cron.ParseStandard(cronExpr); err != nil {
+			return fmt.Errorf("invalid cron expression %q: %w", cronExpr, err)
 		}
 
 		var absConfig string
