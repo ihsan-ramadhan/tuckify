@@ -16,13 +16,17 @@ func NewLaunchdService() *LaunchdService {
 	return &LaunchdService{}
 }
 
-func launchdPlistPath(name string) string {
+func launchdAgentsDir() string {
 	home, _ := os.UserHomeDir()
+	return filepath.Join(home, "Library", "LaunchAgents")
+}
+
+func launchdPlistPath(name string) string {
 	label := "com.ihsan.tuckify"
 	if name != "" {
 		label += "." + name
 	}
-	return filepath.Join(home, "Library", "LaunchAgents", label+".plist")
+	return filepath.Join(launchdAgentsDir(), label+".plist")
 }
 
 func launchdLabel(name string) string {
@@ -70,7 +74,7 @@ func (l *LaunchdService) Uninstall(name string) error {
 		return l.removeOne(lctl, name)
 	}
 
-	dir := filepath.Join(func() string { h, _ := os.UserHomeDir(); return h }(), "Library", "LaunchAgents")
+	dir := launchdAgentsDir()
 	entries, err := os.ReadDir(dir)
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("read LaunchAgents dir: %w", err)

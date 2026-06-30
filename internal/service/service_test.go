@@ -22,10 +22,15 @@ func TestNewService(t *testing.T) {
 		if !isSystemd && !isCrontab {
 			t.Errorf("expected SystemdService or CrontabService on Linux, got %T", srv)
 		}
-	case "darwin", "windows":
-		_, isPlaceholder := srv.(*placeholderService)
-		if !isPlaceholder {
-			t.Errorf("expected placeholderService on %s, got %T", runtime.GOOS, srv)
+	case "darwin":
+		_, ok := srv.(*LaunchdService)
+		if !ok {
+			t.Errorf("expected LaunchdService on darwin, got %T", srv)
+		}
+	case "windows":
+		_, ok := srv.(*WintaskService)
+		if !ok {
+			t.Errorf("expected WintaskService on windows, got %T", srv)
 		}
 	}
 }

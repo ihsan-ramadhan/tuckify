@@ -56,6 +56,19 @@ func Upsert(s Schedule) error {
 	return save(append(ss, s))
 }
 
+func Find(name string) (*Schedule, error) {
+	ss, err := Load()
+	if err != nil {
+		return nil, err
+	}
+	for i := range ss {
+		if ss[i].Name == name {
+			return &ss[i], nil
+		}
+	}
+	return nil, nil
+}
+
 func Delete(name string) (bool, error) {
 	ss, err := Load()
 	if err != nil {

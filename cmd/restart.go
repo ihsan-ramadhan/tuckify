@@ -15,17 +15,9 @@ var restartCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
 
-		schedules, err := store.Load()
+		found, err := store.Find(name)
 		if err != nil {
 			return fmt.Errorf("load schedules: %w", err)
-		}
-
-		var found *store.Schedule
-		for i := range schedules {
-			if schedules[i].Name == name {
-				found = &schedules[i]
-				break
-			}
 		}
 		if found == nil {
 			return fmt.Errorf("schedule %q not found", name)

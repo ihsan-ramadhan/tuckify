@@ -14,30 +14,6 @@ type Service interface {
 	Logs(name string, follow bool, lines int) error
 }
 
-type placeholderService struct {
-	os string
-}
-
-func (p *placeholderService) Install(name, folder, cronExpr, configPath string) error {
-	return fmt.Errorf("not implemented for %s", p.os)
-}
-
-func (p *placeholderService) Uninstall(name string) error {
-	return fmt.Errorf("not implemented for %s", p.os)
-}
-
-func (p *placeholderService) Exists(name string) (bool, error) {
-	return false, nil
-}
-
-func (p *placeholderService) CheckStatus() (string, error) {
-	return "", nil
-}
-
-func (p *placeholderService) Logs(name string, follow bool, lines int) error {
-	return fmt.Errorf("logs not implemented for %s", p.os)
-}
-
 func NewService() (Service, error) {
 	switch runtime.GOOS {
 	case "linux":
