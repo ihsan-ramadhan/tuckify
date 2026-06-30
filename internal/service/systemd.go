@@ -5,12 +5,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
 const (
-	systemctlCmd       = "systemctl"
-	systemdUserFlag    = "--user"
-	systemdServicePath = ".config/systemd/user/tuckify.service"
+	systemctlCmd    = "systemctl"
+	systemdUserFlag = "--user"
 )
 
 type SystemdService struct{}
@@ -19,25 +19,28 @@ func NewSystemdService() *SystemdService {
 	return &SystemdService{}
 }
 
-func (s *SystemdService) Install(folder, cronExpr, configPath string) error {
+func systemdServicePath(name string) string {
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".config", "systemd", "user", "tuckify-"+name+".service")
+}
+
+func systemdServiceDir() string {
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".config", "systemd", "user")
+}
+
+func (s *SystemdService) Install(name, folder, cronExpr, configPath string) error {
 	binaryPath, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("get executable path: %w", err)
 	}
 
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Errorf("get home directory: %w", err)
-	}
-
-	servicePath := filepath.Join(home, systemdServicePath)
-	serviceDir := filepath.Dir(servicePath)
-	if err := os.MkdirAll(serviceDir, 0o755); err != nil {
+	servicePath := systemdServicePath(name)
+	if err := os.MkdirAll(filepath.Dir(servicePath), 0o755); err != nil {
 		return fmt.Errorf("create systemd directory: %w", err)
 	}
 
-	content := buildSystemdContent(binaryPath, folder, cronExpr, configPath)
-
+	content := buildSystemdContent(name, binaryPath, folder, cronExpr, configPath)
 	if err := os.WriteFile(servicePath, []byte(content), 0o644); err != nil {
 		return fmt.Errorf("write systemd service file: %w", err)
 	}
@@ -47,54 +50,64 @@ func (s *SystemdService) Install(folder, cronExpr, configPath string) error {
 		return fmt.Errorf("find systemctl: %w", err)
 	}
 
-	cmdReload := exec.Command(sysctl, systemdUserFlag, "daemon-reload")
-	if err := cmdReload.Run(); err != nil {
+	if err := exec.Command(sysctl, systemdUserFlag, "daemon-reload").Run(); err != nil {
 		return fmt.Errorf("systemd daemon-reload: %w", err)
 	}
 
-	cmdEnable := exec.Command(sysctl, systemdUserFlag, "enable", "--now", "tuckify")
-	if err := cmdEnable.Run(); err != nil {
-		return fmt.Errorf("enable and start tuckify service: %w", err)
+	unitName := "tuckify-" + name
+	if err := exec.Command(sysctl, systemdUserFlag, "enable", "--now", unitName).Run(); err != nil {
+		return fmt.Errorf("enable and start %s service: %w", unitName, err)
 	}
 
 	return nil
 }
 
-func (s *SystemdService) Uninstall() error {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Errorf("get home directory: %w", err)
-	}
-
-	servicePath := filepath.Join(home, systemdServicePath)
-
+func (s *SystemdService) Uninstall(name string) error {
 	sysctl, err := exec.LookPath(systemctlCmd)
 	if err != nil {
 		return fmt.Errorf("find systemctl: %w", err)
 	}
 
+	if name != "" {
+		return s.removeOne(sysctl, name)
+	}
+
+	// remove all tuckify-*.service
+	dir := systemdServiceDir()
+	entries, err := os.ReadDir(dir)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("read systemd dir: %w", err)
+	}
+	for _, e := range entries {
+		n := e.Name()
+		if strings.HasPrefix(n, "tuckify-") && strings.HasSuffix(n, ".service") {
+			unitName := strings.TrimSuffix(n, ".service")
+			_ = s.removeOne(sysctl, strings.TrimPrefix(unitName, "tuckify-"))
+		}
+	}
+
+	_ = exec.Command(sysctl, systemdUserFlag, "daemon-reload").Run()
+	return nil
+}
+
+func (s *SystemdService) removeOne(sysctl, name string) error {
+	servicePath := systemdServicePath(name)
+	unitName := "tuckify-" + name
+
 	if _, err := os.Stat(servicePath); err == nil {
-		cmdDisable := exec.Command(sysctl, systemdUserFlag, "disable", "--now", "tuckify")
-		_ = cmdDisable.Run()
+		_ = exec.Command(sysctl, systemdUserFlag, "disable", "--now", unitName).Run()
 	}
 
 	if err := os.Remove(servicePath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("remove service file: %w", err)
 	}
 
-	cmdReload := exec.Command(sysctl, systemdUserFlag, "daemon-reload")
-	_ = cmdReload.Run()
-
+	_ = exec.Command(sysctl, systemdUserFlag, "daemon-reload").Run()
 	return nil
 }
 
-func (s *SystemdService) Exists() (bool, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return false, fmt.Errorf("get home directory: %w", err)
-	}
-	servicePath := filepath.Join(home, systemdServicePath)
-	_, err = os.Stat(servicePath)
+func (s *SystemdService) Exists(name string) (bool, error) {
+	_, err := os.Stat(systemdServicePath(name))
 	if err == nil {
 		return true, nil
 	}
@@ -105,17 +118,35 @@ func (s *SystemdService) Exists() (bool, error) {
 }
 
 func (s *SystemdService) CheckStatus() (string, error) {
-	return "To check status, run: systemctl --user status tuckify", nil
+	return "Check status: systemctl --user status tuckify-<name>", nil
 }
 
-func buildSystemdContent(binaryPath, folder, cronExpr, configPath string) string {
-	execStart := fmt.Sprintf("%s schedule %s --cron %q", binaryPath, folder, cronExpr)
+func (s *SystemdService) Logs(name string, follow bool, lines int) error {
+	args := []string{"--user", "-u", "tuckify-" + name, "-n", fmt.Sprintf("%d", lines), "-o", "short-monotonic"}
+	if follow {
+		args = append(args, "-f")
+	}
+
+	jctl, err := exec.LookPath("journalctl")
+	if err != nil {
+		return fmt.Errorf("journalctl not found: %w", err)
+	}
+
+	fmt.Printf("\033[1;34m==> logs: tuckify-%s\033[0m\n", name)
+	cmd := exec.Command(jctl, args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+func buildSystemdContent(name, binaryPath, folder, cronExpr, configPath string) string {
+	execStart := fmt.Sprintf("%s schedule %s %s --cron %q", binaryPath, name, folder, cronExpr)
 	if configPath != "" {
 		execStart += fmt.Sprintf(" --config %s", configPath)
 	}
 
 	return fmt.Sprintf(`[Unit]
-Description=tuckify file organizer
+Description=tuckify file organizer (%s)
 After=default.target
 
 [Service]
@@ -125,5 +156,5 @@ RestartSec=5s
 
 [Install]
 WantedBy=default.target
-`, execStart)
+`, name, execStart)
 }

@@ -2,6 +2,7 @@ package service
 
 import (
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -21,55 +22,33 @@ func TestNewService(t *testing.T) {
 		if !isSystemd && !isCrontab {
 			t.Errorf("expected SystemdService or CrontabService on Linux, got %T", srv)
 		}
-	case "darwin", "windows":
-		_, isPlaceholder := srv.(*placeholderService)
-		if !isPlaceholder {
-			t.Errorf("expected placeholderService on %s, got %T", runtime.GOOS, srv)
+	case "darwin":
+		_, ok := srv.(*LaunchdService)
+		if !ok {
+			t.Errorf("expected LaunchdService on darwin, got %T", srv)
+		}
+	case "windows":
+		_, ok := srv.(*WintaskService)
+		if !ok {
+			t.Errorf("expected WintaskService on windows, got %T", srv)
 		}
 	}
 }
 
-func TestCrontabContentUpdate(t *testing.T) {
-	initial := "* * * * * old-job\n"
-	binary := "/usr/bin/tuckify"
-	folder := "/data"
-	cronExpr := "0 9 * * *"
-	cfgPath := "/etc/tuckify.toml"
-
-	updated := updateCrontabContent(initial, binary, folder, cronExpr, cfgPath)
-	expected := "* * * * * old-job\n0 9 * * * /usr/bin/tuckify run /data --config /etc/tuckify.toml # tuckify-managed\n"
-	if updated != expected {
-		t.Errorf("expected %q, got %q", expected, updated)
-	}
-	
-	updatedNoCfg := updateCrontabContent(initial, binary, folder, cronExpr, "")
-	expectedNoCfg := "* * * * * old-job\n0 9 * * * /usr/bin/tuckify run /data # tuckify-managed\n"
-	if updatedNoCfg != expectedNoCfg {
-		t.Errorf("expected %q, got %q", expectedNoCfg, updatedNoCfg)
-	}
-
-	removed, ok := removeCrontabContent(updated)
-	if !ok {
-		t.Error("expected remove to return ok=true")
-	}
-	if removed != initial {
-		t.Errorf("expected %q, got %q", initial, removed)
-	}
-}
-
 func TestSystemdContent(t *testing.T) {
+	name := "downloads"
 	binary := "/usr/bin/tuckify"
 	folder := "/data"
 	cronExpr := "0 9 * * *"
 	cfgPath := "/etc/tuckify.toml"
 
-	content := buildSystemdContent(binary, folder, cronExpr, cfgPath)
+	content := buildSystemdContent(name, binary, folder, cronExpr, cfgPath)
 	expected := `[Unit]
-Description=tuckify file organizer
+Description=tuckify file organizer (downloads)
 After=default.target
 
 [Service]
-ExecStart=/usr/bin/tuckify schedule /data --cron "0 9 * * *" --config /etc/tuckify.toml
+ExecStart=/usr/bin/tuckify schedule downloads /data --cron "0 9 * * *" --config /etc/tuckify.toml
 Restart=on-failure
 RestartSec=5s
 
@@ -80,13 +59,13 @@ WantedBy=default.target
 		t.Errorf("expected %q, got %q", expected, content)
 	}
 
-	contentNoCfg := buildSystemdContent(binary, folder, cronExpr, "")
+	contentNoCfg := buildSystemdContent(name, binary, folder, cronExpr, "")
 	expectedNoCfg := `[Unit]
-Description=tuckify file organizer
+Description=tuckify file organizer (downloads)
 After=default.target
 
 [Service]
-ExecStart=/usr/bin/tuckify schedule /data --cron "0 9 * * *"
+ExecStart=/usr/bin/tuckify schedule downloads /data --cron "0 9 * * *"
 Restart=on-failure
 RestartSec=5s
 
@@ -99,22 +78,24 @@ WantedBy=default.target
 }
 
 func TestLaunchdContent(t *testing.T) {
+	name := "downloads"
 	binary := "/usr/bin/tuckify"
 	folder := "/data"
 	cronExpr := "0 9 * * *"
 	cfgPath := "/etc/tuckify.toml"
 
-	content := buildLaunchdContent(binary, folder, cronExpr, cfgPath)
+	content := buildLaunchdContent(name, binary, folder, cronExpr, cfgPath)
 	expected := `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.ihsan.tuckify</string>
+    <string>com.ihsan.tuckify.downloads</string>
     <key>ProgramArguments</key>
     <array>
         <string>/usr/bin/tuckify</string>
         <string>schedule</string>
+        <string>downloads</string>
         <string>/data</string>
         <string>--cron</string>
         <string>0 9 * * *</string>
@@ -132,17 +113,18 @@ func TestLaunchdContent(t *testing.T) {
 		t.Errorf("expected %q, got %q", expected, content)
 	}
 
-	contentNoCfg := buildLaunchdContent(binary, folder, cronExpr, "")
+	contentNoCfg := buildLaunchdContent(name, binary, folder, cronExpr, "")
 	expectedNoCfg := `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.ihsan.tuckify</string>
+    <string>com.ihsan.tuckify.downloads</string>
     <key>ProgramArguments</key>
     <array>
         <string>/usr/bin/tuckify</string>
         <string>schedule</string>
+        <string>downloads</string>
         <string>/data</string>
         <string>--cron</string>
         <string>0 9 * * *</string>
@@ -159,29 +141,79 @@ func TestLaunchdContent(t *testing.T) {
 	}
 }
 
+func TestCrontabUpsert(t *testing.T) {
+	initial := "* * * * * old-job\n"
+	binary := "/usr/bin/tuckify"
+	folder := "/data"
+	cronExpr := "0 9 * * *"
+	name := "downloads"
+
+	result := upsertCrontabContent(initial, name, binary, folder, cronExpr, "/etc/tuckify.toml")
+	expected := "* * * * * old-job\n0 9 * * * /usr/bin/tuckify run /data --config /etc/tuckify.toml # tuckify-managed:downloads\n"
+	if result != expected {
+		t.Errorf("expected %q, got %q", expected, result)
+	}
+
+	resultNoCfg := upsertCrontabContent(initial, name, binary, folder, cronExpr, "")
+	expectedNoCfg := "* * * * * old-job\n0 9 * * * /usr/bin/tuckify run /data # tuckify-managed:downloads\n"
+	if resultNoCfg != expectedNoCfg {
+		t.Errorf("expected %q, got %q", expectedNoCfg, resultNoCfg)
+	}
+
+	// upsert same name replaces existing line
+	updated := upsertCrontabContent(result, name, binary, folder, "0 18 * * *", "")
+	if strings.Count(updated, "tuckify-managed:downloads") != 1 {
+		t.Errorf("upsert should replace existing entry, got: %q", updated)
+	}
+}
+
+func TestCrontabRemove(t *testing.T) {
+	curr := "* * * * * old-job\n0 9 * * * /usr/bin/tuckify run /data # tuckify-managed:downloads\n0 18 * * * /usr/bin/tuckify run /docs # tuckify-managed:docs\n"
+
+	// remove specific name
+	result, found := removeCrontabContent(curr, "downloads")
+	if !found {
+		t.Error("expected found=true")
+	}
+	if strings.Contains(result, "tuckify-managed:downloads") {
+		t.Error("expected downloads entry removed")
+	}
+	if !strings.Contains(result, "tuckify-managed:docs") {
+		t.Error("expected docs entry preserved")
+	}
+
+	// remove all
+	resultAll, foundAll := removeCrontabContent(curr, "")
+	if !foundAll {
+		t.Error("expected foundAll=true")
+	}
+	if strings.Contains(resultAll, "tuckify-managed") {
+		t.Error("expected all tuckify entries removed")
+	}
+
+	// remove non-existent
+	_, notFound := removeCrontabContent(curr, "nonexistent")
+	if notFound {
+		t.Error("expected found=false for nonexistent name")
+	}
+}
+
 func TestWintaskCmd(t *testing.T) {
+	name := "downloads"
 	binary := `C:\tuckify.exe`
 	folder := `C:\data`
 	cronExpr := "0 9 * * *"
 	cfgPath := `C:\config.toml`
 
-	cmd := buildWintaskCmd(binary, folder, cronExpr, cfgPath)
-	expected := `""C:\tuckify.exe" schedule "C:\data" --cron "0 9 * * *"" --config "C:\config.toml"`
-	// Note: Windows path might have quotes, let's verify our build helper formatting.
-	// In wintask.go: fmt.Sprintf(`"%s" schedule "%s" --cron "%s"`, binaryPath, folder, cronExpr)
-	// So expected: `"C:\tuckify.exe" schedule "C:\data" --cron "0 9 * * *"" --config "C:\config.toml"`
-	expected = `"` + binary + `" schedule "` + folder + `" --cron "` + cronExpr + `"` + ` --config "` + cfgPath + `"`
+	cmd := buildWintaskCmd(name, binary, folder, cronExpr, cfgPath)
+	expected := `"` + binary + `" schedule "` + name + `" "` + folder + `" --cron "` + cronExpr + `"` + ` --config "` + cfgPath + `"`
 	if cmd != expected {
 		t.Errorf("expected %q, got %q", expected, cmd)
 	}
 
-	cmdNoCfg := buildWintaskCmd(binary, folder, cronExpr, "")
-	expectedNoCfg := `"` + binary + `" schedule "` + folder + `" --cron "` + cronExpr + `"`
+	cmdNoCfg := buildWintaskCmd(name, binary, folder, cronExpr, "")
+	expectedNoCfg := `"` + binary + `" schedule "` + name + `" "` + folder + `" --cron "` + cronExpr + `"`
 	if cmdNoCfg != expectedNoCfg {
 		t.Errorf("expected %q, got %q", expectedNoCfg, cmdNoCfg)
 	}
 }
-
-
-
-

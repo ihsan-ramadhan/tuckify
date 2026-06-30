@@ -19,7 +19,7 @@ var uninstallCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		srv, err := service.NewService()
 		if err == nil {
-			if err := srv.Uninstall(); err == nil {
+			if err := srv.Uninstall(""); err == nil {
 				fmt.Println("Service successfully uninstalled.")
 			} else {
 				fmt.Fprintf(os.Stderr, "Warning: failed to uninstall service: %v\n", err)

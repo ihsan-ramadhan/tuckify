@@ -7,30 +7,11 @@ import (
 )
 
 type Service interface {
-	Install(folder, cronExpr, configPath string) error
-	Uninstall() error
-	Exists() (bool, error)
+	Install(name, folder, cronExpr, configPath string) error
+	Uninstall(name string) error // "" = remove all
+	Exists(name string) (bool, error)
 	CheckStatus() (string, error)
-}
-
-type placeholderService struct {
-	os string
-}
-
-func (p *placeholderService) Install(folder string, cronExpr string, configPath string) error {
-	return fmt.Errorf("not implemented for %s", p.os)
-}
-
-func (p *placeholderService) Uninstall() error {
-	return fmt.Errorf("not implemented for %s", p.os)
-}
-
-func (p *placeholderService) Exists() (bool, error) {
-	return false, nil
-}
-
-func (p *placeholderService) CheckStatus() (string, error) {
-	return "", nil
+	Logs(name string, follow bool, lines int) error
 }
 
 func NewService() (Service, error) {
@@ -40,8 +21,10 @@ func NewService() (Service, error) {
 			return NewSystemdService(), nil
 		}
 		return NewCrontabService(), nil
-	case "darwin", "windows":
-		return &placeholderService{os: runtime.GOOS}, nil
+	case "darwin":
+		return NewLaunchdService(), nil
+	case "windows":
+		return NewWintaskService(), nil
 	default:
 		return nil, fmt.Errorf("unsupported operating system: %s", runtime.GOOS)
 	}

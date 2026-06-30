@@ -14,20 +14,21 @@ func NewWintaskService() *WintaskService {
 	return &WintaskService{}
 }
 
-func (w *WintaskService) Install(folder, cronExpr, configPath string) error {
+func (w *WintaskService) Install(name, folder, cronExpr, configPath string) error {
 	binaryPath, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("get executable path: %w", err)
 	}
 
-	execCmd := buildWintaskCmd(binaryPath, folder, cronExpr, configPath)
+	execCmd := buildWintaskCmd(name, binaryPath, folder, cronExpr, configPath)
+	taskName := "tuckify-" + name
 
 	winSch, err := exec.LookPath(schtasksCmd)
 	if err != nil {
 		return fmt.Errorf("find schtasks: %w", err)
 	}
 
-	cmd := exec.Command(winSch, "/create", "/tn", "tuckify", "/tr", execCmd, "/sc", "onlogon", "/f")
+	cmd := exec.Command(winSch, "/create", "/tn", taskName, "/tr", execCmd, "/sc", "onlogon", "/f")
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("create scheduled task: %w", err)
 	}
@@ -35,36 +36,44 @@ func (w *WintaskService) Install(folder, cronExpr, configPath string) error {
 	return nil
 }
 
-func (w *WintaskService) Uninstall() error {
+func (w *WintaskService) Uninstall(name string) error {
 	winSch, err := exec.LookPath(schtasksCmd)
 	if err != nil {
 		return fmt.Errorf("find schtasks: %w", err)
 	}
 
-	cmd := exec.Command(winSch, "/delete", "/tn", "tuckify", "/f")
-	_ = cmd.Run()
+	taskName := "tuckify"
+	if name != "" {
+		taskName = "tuckify-" + name
+	}
+
+	_ = exec.Command(winSch, "/delete", "/tn", taskName, "/f").Run()
 	return nil
 }
 
-func (w *WintaskService) Exists() (bool, error) {
+func (w *WintaskService) Exists(name string) (bool, error) {
 	winSch, err := exec.LookPath(schtasksCmd)
 	if err != nil {
 		return false, fmt.Errorf("find schtasks: %w", err)
 	}
 
-	cmd := exec.Command(winSch, "/query", "/tn", "tuckify")
-	if err := cmd.Run(); err != nil {
+	taskName := "tuckify-" + name
+	if err := exec.Command(winSch, "/query", "/tn", taskName).Run(); err != nil {
 		return false, nil
 	}
 	return true, nil
 }
 
 func (w *WintaskService) CheckStatus() (string, error) {
-	return `To check status, run in cmd: schtasks /query /tn "tuckify"`, nil
+	return `To check status, run in cmd: schtasks /query /tn "tuckify-<name>"`, nil
 }
 
-func buildWintaskCmd(binaryPath, folder, cronExpr, configPath string) string {
-	execCmd := fmt.Sprintf(`"%s" schedule "%s" --cron "%s"`, binaryPath, folder, cronExpr)
+func (w *WintaskService) Logs(name string, follow bool, lines int) error {
+	return fmt.Errorf("logs not available for Windows Task Scheduler — check Event Viewer")
+}
+
+func buildWintaskCmd(name, binaryPath, folder, cronExpr, configPath string) string {
+	execCmd := fmt.Sprintf(`"%s" schedule "%s" "%s" --cron "%s"`, binaryPath, name, folder, cronExpr)
 	if configPath != "" {
 		execCmd += fmt.Sprintf(` --config "%s"`, configPath)
 	}

@@ -5,12 +5,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
-const (
-	launchctlCmd        = "launchctl"
-	launchdPlistRelPath = "Library/LaunchAgents/com.ihsan.tuckify.plist"
-)
+const launchctlCmd = "launchctl"
 
 type LaunchdService struct{}
 
@@ -18,25 +16,38 @@ func NewLaunchdService() *LaunchdService {
 	return &LaunchdService{}
 }
 
-func (l *LaunchdService) Install(folder, cronExpr, configPath string) error {
+func launchdAgentsDir() string {
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, "Library", "LaunchAgents")
+}
+
+func launchdPlistPath(name string) string {
+	label := "com.ihsan.tuckify"
+	if name != "" {
+		label += "." + name
+	}
+	return filepath.Join(launchdAgentsDir(), label+".plist")
+}
+
+func launchdLabel(name string) string {
+	if name == "" {
+		return "com.ihsan.tuckify"
+	}
+	return "com.ihsan.tuckify." + name
+}
+
+func (l *LaunchdService) Install(name, folder, cronExpr, configPath string) error {
 	binaryPath, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("get executable path: %w", err)
 	}
 
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Errorf("get home directory: %w", err)
-	}
-
-	plistPath := filepath.Join(home, launchdPlistRelPath)
-	plistDir := filepath.Dir(plistPath)
-	if err := os.MkdirAll(plistDir, 0o755); err != nil {
+	plistPath := launchdPlistPath(name)
+	if err := os.MkdirAll(filepath.Dir(plistPath), 0o755); err != nil {
 		return fmt.Errorf("create LaunchAgents directory: %w", err)
 	}
 
-	content := buildLaunchdContent(binaryPath, folder, cronExpr, configPath)
-
+	content := buildLaunchdContent(name, binaryPath, folder, cronExpr, configPath)
 	if err := os.WriteFile(plistPath, []byte(content), 0o644); err != nil {
 		return fmt.Errorf("write plist file: %w", err)
 	}
@@ -46,46 +57,55 @@ func (l *LaunchdService) Install(folder, cronExpr, configPath string) error {
 		return fmt.Errorf("find launchctl: %w", err)
 	}
 
-	cmdLoad := exec.Command(lctl, "load", plistPath)
-	if err := cmdLoad.Run(); err != nil {
+	if err := exec.Command(lctl, "load", plistPath).Run(); err != nil {
 		return fmt.Errorf("launchctl load plist: %w", err)
 	}
 
 	return nil
 }
 
-func (l *LaunchdService) Uninstall() error {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Errorf("get home directory: %w", err)
-	}
-
-	plistPath := filepath.Join(home, launchdPlistRelPath)
-
+func (l *LaunchdService) Uninstall(name string) error {
 	lctl, err := exec.LookPath(launchctlCmd)
 	if err != nil {
 		return fmt.Errorf("find launchctl: %w", err)
 	}
 
-	if _, err := os.Stat(plistPath); err == nil {
-		cmdUnload := exec.Command(lctl, "unload", plistPath)
-		_ = cmdUnload.Run()
+	if name != "" {
+		return l.removeOne(lctl, name)
 	}
 
-	if err := os.Remove(plistPath); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("remove plist file: %w", err)
+	dir := launchdAgentsDir()
+	entries, err := os.ReadDir(dir)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("read LaunchAgents dir: %w", err)
 	}
-
+	for _, e := range entries {
+		n := e.Name()
+		if strings.HasPrefix(n, "com.ihsan.tuckify") && strings.HasSuffix(n, ".plist") {
+			label := strings.TrimSuffix(n, ".plist")
+			scheduleName := strings.TrimPrefix(label, "com.ihsan.tuckify.")
+			if scheduleName == "com.ihsan.tuckify" {
+				scheduleName = ""
+			}
+			_ = l.removeOne(lctl, scheduleName)
+		}
+	}
 	return nil
 }
 
-func (l *LaunchdService) Exists() (bool, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return false, fmt.Errorf("get home directory: %w", err)
+func (l *LaunchdService) removeOne(lctl, name string) error {
+	plistPath := launchdPlistPath(name)
+	if _, err := os.Stat(plistPath); err == nil {
+		_ = exec.Command(lctl, "unload", plistPath).Run()
 	}
-	plistPath := filepath.Join(home, launchdPlistRelPath)
-	_, err = os.Stat(plistPath)
+	if err := os.Remove(plistPath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("remove plist file: %w", err)
+	}
+	return nil
+}
+
+func (l *LaunchdService) Exists(name string) (bool, error) {
+	_, err := os.Stat(launchdPlistPath(name))
 	if err == nil {
 		return true, nil
 	}
@@ -96,16 +116,21 @@ func (l *LaunchdService) Exists() (bool, error) {
 }
 
 func (l *LaunchdService) CheckStatus() (string, error) {
-	return "To check status, run: launchctl list | grep tuckify", nil
+	return "Check status: launchctl list | grep tuckify", nil
 }
 
-func buildLaunchdContent(binaryPath, folder, cronExpr, configPath string) string {
+func (l *LaunchdService) Logs(name string, follow bool, lines int) error {
+	return fmt.Errorf("logs not available for launchd — check Console.app or ~/Library/Logs")
+}
+
+func buildLaunchdContent(name, binaryPath, folder, cronExpr, configPath string) string {
 	argsXml := fmt.Sprintf(`        <string>%s</string>
         <string>schedule</string>
         <string>%s</string>
+        <string>%s</string>
         <string>--cron</string>
         <string>%s</string>
-`, binaryPath, folder, cronExpr)
+`, binaryPath, name, folder, cronExpr)
 
 	if configPath != "" {
 		argsXml += fmt.Sprintf(`        <string>--config</string>
@@ -118,7 +143,7 @@ func buildLaunchdContent(binaryPath, folder, cronExpr, configPath string) string
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.ihsan.tuckify</string>
+    <string>%s</string>
     <key>ProgramArguments</key>
     <array>
 %s    </array>
@@ -128,5 +153,5 @@ func buildLaunchdContent(binaryPath, folder, cronExpr, configPath string) string
     <true/>
 </dict>
 </plist>
-`, argsXml)
+`, launchdLabel(name), argsXml)
 }

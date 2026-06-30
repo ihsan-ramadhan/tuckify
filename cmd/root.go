@@ -1,10 +1,12 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 
-	"github.com/spf13/cobra"
+	"github.com/fatih/color"
 	"github.com/ihsan-ramadhan/tuckify/internal/config"
+	"github.com/spf13/cobra"
 )
 
 var configPath string
@@ -18,6 +20,13 @@ var rootCmd = &cobra.Command{
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
+	}
+}
+
+func warnNoRules(cfg *config.Config, path string) {
+	if len(cfg.Rules) == 0 {
+		color.Yellow("warning: no rules defined in %s — nothing to organize", path)
+		fmt.Printf("hint: create a config at %s (see rules.example.toml)\n", config.DefaultConfigPath())
 	}
 }
 
