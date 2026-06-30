@@ -115,14 +115,17 @@ tuckify uninstall
 ```
 # 1. save a schedule
 tuckify schedule downloads ~/Downloads --cron "0 9 * * *"
+# saved schedule "downloads"
+#   run 'tuckify start downloads' to activate as a background service
 
 # 2. activate it as a background service
 tuckify start downloads
 
-# 3. check
+# 3. check status
 tuckify list
-# NAME                 STATUS     CRON            FOLDER
-# downloads            online     0 9 * * *       /home/user/Downloads
+#  NAME               │ STATUS   │ SAVED  │ CRON           │ FOLDER
+# ────────────────────┼──────────┼────────┼────────────────┼──────────────────────
+#  downloads          │ online   │ yes    │ 0 9 * * *      │ /home/user/Downloads
 
 # 4. survive reboots
 tuckify startup

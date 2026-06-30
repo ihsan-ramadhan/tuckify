@@ -2,10 +2,19 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
+	"github.com/fatih/color"
 	"github.com/ihsan-ramadhan/tuckify/internal/service"
 	"github.com/ihsan-ramadhan/tuckify/internal/store"
 	"github.com/spf13/cobra"
+)
+
+var (
+	colOnline  = color.New(color.FgGreen, color.Bold)
+	colOffline = color.New(color.FgRed)
+	colHint    = color.New(color.FgYellow)
+	colHeader  = color.New(color.Bold)
 )
 
 var listCmd = &cobra.Command{
@@ -27,33 +36,62 @@ var listCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Printf("%-20s %-10s %-8s %-15s %s\n", "NAME", "STATUS", "SAVED", "CRON", "FOLDER")
+		const (
+			wName   = 20
+			wStatus = 10
+			wSaved  = 8
+			wCron   = 16
+		)
+
+		wFolder := 6 // min "FOLDER"
+		for _, s := range schedules {
+			if len(s.Folder)+2 > wFolder {
+				wFolder = len(s.Folder) + 2
+			}
+		}
+
+		sep := strings.Repeat("─", wName) + "┼" +
+			strings.Repeat("─", wStatus) + "┼" +
+			strings.Repeat("─", wSaved) + "┼" +
+			strings.Repeat("─", wCron) + "┼" +
+			strings.Repeat("─", wFolder)
+
+		colHeader.Printf(" %-*s│ %-*s│ %-*s│ %-*s│ %s\n",
+			wName-1, "NAME",
+			wStatus-1, "STATUS",
+			wSaved-1, "SAVED",
+			wCron-1, "CRON",
+			"FOLDER")
+		fmt.Println(sep)
 
 		var unsaved []string
 		for _, s := range schedules {
 			online, _ := srv.Exists(s.Name)
 
-			status := "offline"
-			saved := "no"
-
-			if online {
-				status = "online"
-				saved = "yes"
-			}
-
-			fmt.Printf("%-20s %-10s %-8s %-15s %s\n", s.Name, status, saved, s.Cron, s.Folder)
-
+			var statusText, savedText string
+			col := colOnline
 			if !online {
+				statusText, savedText = "offline", "no"
+				col = colOffline
 				unsaved = append(unsaved, s.Name)
+			} else {
+				statusText, savedText = "online", "yes"
 			}
+
+			fmt.Printf(" %-*s│ %s%s│ %s%s│ %-*s│ %s\n",
+				wName-1, s.Name,
+				col.Sprint(statusText), strings.Repeat(" ", wStatus-1-len(statusText)),
+				col.Sprint(savedText), strings.Repeat(" ", wSaved-1-len(savedText)),
+				wCron-1, s.Cron,
+				s.Folder)
 		}
 
 		if len(unsaved) > 0 {
 			fmt.Println()
 			for _, name := range unsaved {
-				fmt.Printf("  ! %q not active — run 'tuckify start %s'\n", name, name)
+				colHint.Printf("  ! %q not active — run 'tuckify start %s'\n", name, name)
 			}
-			fmt.Println("  To activate all at once: tuckify startup")
+			colHint.Println("  To activate all at once: tuckify startup")
 		}
 
 		return nil
