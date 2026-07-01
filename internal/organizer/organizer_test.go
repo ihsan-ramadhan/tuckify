@@ -443,4 +443,96 @@ func TestDeleteEmptyDirs(t *testing.T) {
 	}
 }
 
+func TestOrganizeDuplicateDetection(t *testing.T) {
+	dir := t.TempDir()
+	srcDir := filepath.Join(dir, "src")
+	destDir := filepath.Join(dir, "dest")
+	if err := os.MkdirAll(srcDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(destDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	content := []byte("identical-content")
+	src := filepath.Join(srcDir, "a.pdf")
+	dest := filepath.Join(destDir, "a.pdf")
+	if err := os.WriteFile(src, content, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(dest, content, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := makeConfig("delete_duplicate", config.Rule{
+		Name:        "Move identical",
+		Extensions:  []string{".pdf"},
+		Destination: destDir,
+		Action:      "move",
+	})
+
+	results, err := Organize(srcDir, cfg, false, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+
+	if _, err := os.Stat(src); !os.IsNotExist(err) {
+		t.Error("expected duplicate source file to be deleted")
+	}
+
+	if _, err := os.Stat(dest); os.IsNotExist(err) {
+		t.Error("expected destination file to remain")
+	}
+}
+
+func TestOrganizeDuplicateDetectionDifferentContent(t *testing.T) {
+	dir := t.TempDir()
+	srcDir := filepath.Join(dir, "src")
+	destDir := filepath.Join(dir, "dest")
+	if err := os.MkdirAll(srcDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(destDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	src := filepath.Join(srcDir, "a.pdf")
+	dest := filepath.Join(destDir, "a.pdf")
+	if err := os.WriteFile(src, []byte("content-a"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(dest, []byte("content-b"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := makeConfig("delete_duplicate", config.Rule{
+		Name:        "Move different",
+		Extensions:  []string{".pdf"},
+		Destination: destDir,
+		Action:      "move",
+	})
+
+	results, err := Organize(srcDir, cfg, false, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+
+	expectedDest := filepath.Join(destDir, "a_1.pdf")
+	if results[0].Destination != expectedDest {
+		t.Errorf("expected destination %q, got %q", expectedDest, results[0].Destination)
+	}
+
+	if _, err := os.Stat(expectedDest); os.IsNotExist(err) {
+		t.Error("expected source file to be renamed and moved")
+	}
+}
+
 

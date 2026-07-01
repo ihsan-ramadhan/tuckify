@@ -1,6 +1,8 @@
 package organizer
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"io/fs"
@@ -142,6 +144,20 @@ func parseTemplates(pattern string, info os.FileInfo) string {
 	return r.Replace(pattern)
 }
 
+func calculateHash(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = f.Close() }()
+
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
 func processFile(src string, rule *config.Rule, conflictStrategy string, info os.FileInfo) (string, error) {
 	if rule.Action == "delete" {
 		if err := os.Remove(src); err != nil {
@@ -160,26 +176,44 @@ func processFile(src string, rule *config.Rule, conflictStrategy string, info os
 		targetName = parseTemplates(rule.Rename, info)
 	}
 
-	dest, err := resolveDest(destDir, targetName, conflictStrategy)
+	dest := filepath.Join(destDir, targetName)
+	if _, err := os.Stat(dest); err == nil {
+		if conflictStrategy == "delete_duplicate" {
+			srcHash, err1 := calculateHash(src)
+			destHash, err2 := calculateHash(dest)
+			if err1 == nil && err2 == nil && srcHash == destHash {
+				if rule.Action == "copy" {
+					return "", nil
+				}
+				if err := os.Remove(src); err != nil {
+					return "", fmt.Errorf("delete duplicate source: %w", err)
+				}
+				return dest, nil
+			}
+			conflictStrategy = "rename"
+		}
+	}
+
+	resolvedDest, err := resolveDest(destDir, targetName, conflictStrategy)
 	if err != nil {
 		return "", err
 	}
-	if dest == "" {
+	if resolvedDest == "" {
 		return "", nil
 	}
 
 	switch rule.Action {
 	case "copy":
-		if err := copyFile(src, dest); err != nil {
+		if err := copyFile(src, resolvedDest); err != nil {
 			return "", fmt.Errorf("copy file: %w", err)
 		}
 	default:
-		if err := os.Rename(src, dest); err != nil {
+		if err := os.Rename(src, resolvedDest); err != nil {
 			return "", fmt.Errorf("move file: %w", err)
 		}
 	}
 
-	return dest, nil
+	return resolvedDest, nil
 }
 
 func MoveFile(src, destDir, conflictStrategy string) (string, error) {
