@@ -97,7 +97,7 @@ func Organize(folder string, cfg *config.Config, dryRun bool) ([]Result, error) 
 			})
 			continue
 		} else {
-			f.Close()
+			_ = f.Close()
 		}
 
 		if dryRun {

@@ -70,6 +70,6 @@ var scheduleCmd = &cobra.Command{
 func init() {
 	scheduleCmd.Flags().StringVar(&cronExpr, "cron", "", `cron expression, e.g. "0 9 * * *"`)
 	scheduleCmd.Flags().BoolVar(&scheduleRun, "run", false, "also start interactive scheduler after saving")
-	scheduleCmd.MarkFlagRequired("cron")
+	_ = scheduleCmd.MarkFlagRequired("cron")
 	rootCmd.AddCommand(scheduleCmd)
 }

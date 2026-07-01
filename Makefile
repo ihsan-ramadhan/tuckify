@@ -1,4 +1,4 @@
-.PHONY: build release clean test
+.PHONY: build release clean test lint install-hooks
 
 BINARY_NAME=tuckify
 
@@ -11,6 +11,12 @@ test:
 clean:
 	rm -f $(BINARY_NAME)
 	rm -rf dist/
+
+lint:
+	golangci-lint run ./...
+
+install-hooks:
+	lefthook install
 
 release: clean
 	mkdir -p dist

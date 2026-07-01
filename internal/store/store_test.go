@@ -14,7 +14,7 @@ func setupTempStore(t *testing.T) func() {
 	t.Setenv("HOME", tmp)
 	// pre-create config dir
 	_ = os.MkdirAll(filepath.Join(tmp, ".config", "tuckify"), 0o755)
-	return func() { os.Setenv("HOME", orig) }
+	return func() { _ = os.Setenv("HOME", orig) }
 }
 
 func TestLoadEmpty(t *testing.T) {

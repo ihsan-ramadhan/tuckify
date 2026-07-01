@@ -34,12 +34,12 @@ func TestMatchRule(t *testing.T) {
 func TestConflictRename(t *testing.T) {
 	dir := t.TempDir()
 	dest := filepath.Join(dir, "dest")
-	os.MkdirAll(dest, 0o755)
+	_ = os.MkdirAll(dest, 0o755)
 
-	os.WriteFile(filepath.Join(dest, "a.pdf"), []byte("orig"), 0o644)
+	_ = os.WriteFile(filepath.Join(dest, "a.pdf"), []byte("orig"), 0o644)
 
 	src := filepath.Join(dir, "a.pdf")
-	os.WriteFile(src, []byte("new"), 0o644)
+	_ = os.WriteFile(src, []byte("new"), 0o644)
 
 	cfg := makeConfig("rename", config.Rule{Extensions: []string{".pdf"}, Destination: dest})
 	results, err := Organize(dir, cfg, false)
@@ -57,7 +57,7 @@ func TestConflictRename(t *testing.T) {
 func TestDryRun(t *testing.T) {
 	dir := t.TempDir()
 	src := filepath.Join(dir, "test.pdf")
-	os.WriteFile(src, []byte("data"), 0o644)
+	_ = os.WriteFile(src, []byte("data"), 0o644)
 
 	cfg := makeConfig("rename", config.Rule{Extensions: []string{".pdf"}, Destination: "/docs"})
 	results, err := Organize(dir, cfg, true)
