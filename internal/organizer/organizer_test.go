@@ -149,7 +149,7 @@ func TestConflictOverwrite(t *testing.T) {
 }
 
 func TestParseTemplates(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "test_file.txt")
+	path := filepath.Join(t.TempDir(), "My Resume 2024.txt")
 	if err := os.WriteFile(path, []byte("hello"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -162,7 +162,10 @@ func TestParseTemplates(t *testing.T) {
 		pattern string
 		want    string
 	}{
-		{"{base}_new{ext}", "test_file_new.txt"},
+		{"{base}_new{ext}", "My Resume 2024_new.txt"},
+		{"{base:lower}{ext}", "my resume 2024.txt"},
+		{"{base:upper}{ext}", "MY RESUME 2024.txt"},
+		{"{base:slug}{ext}", "my-resume-2024.txt"},
 		{"{year}/{month}/{day}", info.ModTime().Format("2006/01/02")},
 		{"{hour}:{minute}:{second}", info.ModTime().Format("15:04:05")},
 		{"static_text", "static_text"},

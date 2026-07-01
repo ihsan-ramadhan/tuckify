@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -123,6 +124,26 @@ func copyFile(src, dest string) (err error) {
 	return nil
 }
 
+var templateRegex = regexp.MustCompile(`\{([a-zA-Z]+)(?::([a-zA-Z]+))?\}`)
+
+func slugify(s string) string {
+	s = strings.ToLower(s)
+	var builder strings.Builder
+	lastWasDash := false
+	for _, r := range s {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			builder.WriteRune(r)
+			lastWasDash = false
+		} else if r == ' ' || r == '-' || r == '_' || r == '.' {
+			if !lastWasDash && builder.Len() > 0 {
+				builder.WriteRune('-')
+				lastWasDash = true
+			}
+		}
+	}
+	return strings.TrimSuffix(builder.String(), "-")
+}
+
 func parseTemplates(pattern string, info os.FileInfo) string {
 	if pattern == "" {
 		return ""
@@ -131,17 +152,50 @@ func parseTemplates(pattern string, info os.FileInfo) string {
 	base := strings.TrimSuffix(info.Name(), ext)
 	t := info.ModTime()
 
-	r := strings.NewReplacer(
-		"{year}", t.Format("2006"),
-		"{month}", t.Format("01"),
-		"{day}", t.Format("02"),
-		"{hour}", t.Format("15"),
-		"{minute}", t.Format("04"),
-		"{second}", t.Format("05"),
-		"{base}", base,
-		"{ext}", ext,
-	)
-	return r.Replace(pattern)
+	return templateRegex.ReplaceAllStringFunc(pattern, func(m string) string {
+		match := templateRegex.FindStringSubmatch(m)
+		if len(match) < 2 {
+			return m
+		}
+		key := match[1]
+		var modifier string
+		if len(match) > 2 {
+			modifier = match[2]
+		}
+
+		var val string
+		switch key {
+		case "year":
+			val = t.Format("2006")
+		case "month":
+			val = t.Format("01")
+		case "day":
+			val = t.Format("02")
+		case "hour":
+			val = t.Format("15")
+		case "minute":
+			val = t.Format("04")
+		case "second":
+			val = t.Format("05")
+		case "base":
+			val = base
+		case "ext":
+			val = ext
+		default:
+			return m
+		}
+
+		switch modifier {
+		case "lower":
+			val = strings.ToLower(val)
+		case "upper":
+			val = strings.ToUpper(val)
+		case "slug":
+			val = slugify(val)
+		}
+
+		return val
+	})
 }
 
 func calculateHash(path string) (string, error) {
