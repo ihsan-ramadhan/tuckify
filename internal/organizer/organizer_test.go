@@ -31,6 +31,36 @@ func TestMatchRule(t *testing.T) {
 	}
 }
 
+func TestMatchRuleFilenamePattern(t *testing.T) {
+	rules := []config.Rule{
+		{FilenamePatterns: []string{"*Modul*"}, Destination: "/modul"},
+		{FilenamePatterns: []string{"Invoice_*"}, Destination: "/invoices"},
+	}
+
+	cases := []struct {
+		file    string
+		dest    string
+		wantNil bool
+	}{
+		{"Modul1_Proyek.pdf", "/modul", false},
+		{"Data_Modul_2.docx", "/modul", false},
+		{"Modul", "/modul", false},        // no extension
+		{"Invoice_2024.pdf", "/invoices", false},
+		{"report.pdf", "", true},
+		{"MODUL_test.txt", "/modul", false}, // case-insensitive
+	}
+
+	for _, c := range cases {
+		r := MatchRule(c.file, rules)
+		if c.wantNil && r != nil {
+			t.Errorf("%s: expected no match, got %s", c.file, r.Destination)
+		}
+		if !c.wantNil && (r == nil || r.Destination != c.dest) {
+			t.Errorf("%s: expected dest %s, got %v", c.file, c.dest, r)
+		}
+	}
+}
+
 func TestConflictRename(t *testing.T) {
 	dir := t.TempDir()
 	dest := filepath.Join(dir, "dest")

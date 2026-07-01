@@ -21,9 +21,10 @@ type Settings struct {
 }
 
 type Rule struct {
-	Name        string   `toml:"name"`
-	Extensions  []string `toml:"extensions"`
-	Destination string   `toml:"destination"`
+	Name             string   `toml:"name"`
+	Extensions       []string `toml:"extensions"`
+	FilenamePatterns []string `toml:"filename_patterns"`
+	Destination      string   `toml:"destination"`
 }
 
 func DefaultConfigPath() string {

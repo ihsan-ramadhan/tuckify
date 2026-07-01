@@ -163,15 +163,29 @@ Default path: `~/.tuckify/rules.toml`
 conflict_strategy = "rename"   # "rename" | "skip" | "overwrite"
 
 [[rule]]
-name        = "Rule name (optional, for logging)"
+name        = "By extension"
 extensions  = [".pdf", ".docx"]
 destination = "~/Documents"
+
+[[rule]]
+name              = "By filename"
+filename_patterns = ["*Modul*", "Invoice_*"]
+destination       = "~/Documents/Sorted"
 ```
+
+A rule can have `extensions`, `filename_patterns`, or both — a file matches if either condition is met.
+
+Filename patterns use glob syntax (`*` matches any characters, case-insensitive):
+- `"*Modul*"` — any file containing "Modul"
+- `"Invoice_*"` — any file starting with "Invoice_"
+- `"*_2024.*"` — any file with "_2024" before the extension
 
 ### Behavior
 
 - Rules run **top to bottom**, file matches **first rule only**
 - Extension matching is **case-insensitive** (`.PDF` == `.pdf`)
+- Filename pattern matching is **case-insensitive**
+- Files without an extension can match via `filename_patterns`
 - Missing destination folders are created automatically
 - Default conflict strategy `rename`: appends `_1`, `_2`, etc.
 
