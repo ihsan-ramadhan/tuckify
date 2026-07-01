@@ -10,6 +10,7 @@ import (
 
 	"github.com/ihsan-ramadhan/tuckify/internal/config"
 	"github.com/ihsan-ramadhan/tuckify/internal/organizer"
+	"github.com/ihsan-ramadhan/tuckify/internal/store"
 	"github.com/robfig/cron/v3"
 )
 
@@ -38,7 +39,13 @@ func Run(name, folder, expr, configPath string) error {
 			fmt.Fprintf(os.Stderr, "error loading config: %v\n", err)
 			return
 		}
-		results, err := organizer.Organize(folder, cfg, false, false)
+
+		recursive := false
+		if s, err := store.Find(name); err == nil && s != nil {
+			recursive = s.Recursive
+		}
+
+		results, err := organizer.Organize(folder, cfg, false, recursive)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			return
