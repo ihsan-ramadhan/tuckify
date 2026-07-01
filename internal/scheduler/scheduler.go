@@ -38,21 +38,61 @@ func Run(name, folder, expr, configPath string) error {
 			fmt.Fprintf(os.Stderr, "error loading config: %v\n", err)
 			return
 		}
-		results, err := organizer.Organize(folder, cfg, false)
+		results, err := organizer.Organize(folder, cfg, false, false)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			return
 		}
 		moved := 0
+		copied := 0
+		deleted := 0
 		for _, r := range results {
 			if r.Skipped {
 				fmt.Fprintf(os.Stderr, "skipped %s: %s\n", r.Source, r.SkipReason)
 				continue
 			}
-			fmt.Printf("moved %q → %s\n", r.Source, r.Destination)
-			moved++
+
+			actionVerb := "moved"
+			switch r.Action {
+			case "copy":
+				actionVerb = "copied"
+			case "delete":
+				actionVerb = "deleted"
+			}
+
+			if r.Action == "delete" {
+				fmt.Printf("deleted %q\n", r.Source)
+				deleted++
+			} else {
+				fmt.Printf("%s %q → %s\n", actionVerb, r.Source, r.Destination)
+				if r.Action == "copy" {
+					copied++
+				} else {
+					moved++
+				}
+			}
 		}
-		fmt.Printf("%d file(s) moved\n", moved)
+
+		summary := ""
+		if moved > 0 {
+			summary += fmt.Sprintf("%d file(s) moved", moved)
+		}
+		if copied > 0 {
+			if summary != "" {
+				summary += ", "
+			}
+			summary += fmt.Sprintf("%d file(s) copied", copied)
+		}
+		if deleted > 0 {
+			if summary != "" {
+				summary += ", "
+			}
+			summary += fmt.Sprintf("%d file(s) deleted", deleted)
+		}
+		if summary == "" {
+			summary = "0 file(s) processed"
+		}
+		fmt.Println(summary)
 	})
 	if err != nil {
 		return fmt.Errorf("invalid cron expression: %w", err)

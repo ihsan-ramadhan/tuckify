@@ -3,6 +3,7 @@ package organizer
 import (
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -190,21 +191,78 @@ func MoveFile(src, destDir, conflictStrategy string) (string, error) {
 	return processFile(src, rule, conflictStrategy, info)
 }
 
-func Organize(folder string, cfg *config.Config, dryRun bool) ([]Result, error) {
-	entries, err := os.ReadDir(folder)
+func listFiles(folder string, recursive bool) ([]string, error) {
+	var files []string
+	if !recursive {
+		entries, err := os.ReadDir(folder)
+		if err != nil {
+			return nil, err
+		}
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				files = append(files, filepath.Join(folder, entry.Name()))
+			}
+		}
+		return files, nil
+	}
+
+	err := filepath.WalkDir(folder, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() {
+			files = append(files, path)
+		}
+		return nil
+	})
+	return files, err
+}
+
+func deleteEmptyDirs(root string) error {
+	var dirs []string
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() && path != root {
+			dirs = append(dirs, path)
+		}
+		return nil
+	})
 	if err != nil {
-		return nil, fmt.Errorf("read folder: %w", err)
+		return err
+	}
+
+	for i := 0; i < len(dirs); i++ {
+		for j := i + 1; j < len(dirs); j++ {
+			if len(dirs[i]) < len(dirs[j]) {
+				dirs[i], dirs[j] = dirs[j], dirs[i]
+			}
+		}
+	}
+
+	for _, dir := range dirs {
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			continue
+		}
+		if len(entries) == 0 {
+			_ = os.Remove(dir)
+		}
+	}
+	return nil
+}
+
+func Organize(folder string, cfg *config.Config, dryRun bool, recursive bool) ([]Result, error) {
+	files, err := listFiles(folder, recursive)
+	if err != nil {
+		return nil, fmt.Errorf("list files: %w", err)
 	}
 
 	var results []Result
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		name := entry.Name()
-		src := filepath.Join(folder, name)
-
-		info, err := entry.Info()
+	for _, src := range files {
+		name := filepath.Base(src)
+		info, err := os.Stat(src)
 		if err != nil {
 			results = append(results, Result{
 				Source:     src,
@@ -270,5 +328,10 @@ func Organize(folder string, cfg *config.Config, dryRun bool) ([]Result, error) 
 		}
 		results = append(results, Result{Source: src, Destination: dest, Action: rule.Action})
 	}
+
+	if recursive && !dryRun {
+		_ = deleteEmptyDirs(folder)
+	}
+
 	return results, nil
 }

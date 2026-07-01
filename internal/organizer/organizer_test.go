@@ -79,7 +79,7 @@ func TestConflictRename(t *testing.T) {
 	dir, _, dest := setupConflictTest(t)
 
 	cfg := makeConfig("rename", config.Rule{Extensions: []string{".pdf"}, Destination: dest})
-	results, err := Organize(dir, cfg, false)
+	results, err := Organize(dir, cfg, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +97,7 @@ func TestDryRun(t *testing.T) {
 	_ = os.WriteFile(src, []byte("data"), 0o644)
 
 	cfg := makeConfig("rename", config.Rule{Extensions: []string{".pdf"}, Destination: "/docs"})
-	results, err := Organize(dir, cfg, true)
+	results, err := Organize(dir, cfg, true, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +113,7 @@ func TestConflictSkip(t *testing.T) {
 	dir, _, dest := setupConflictTest(t)
 
 	cfg := makeConfig("skip", config.Rule{Extensions: []string{".pdf"}, Destination: dest})
-	results, err := Organize(dir, cfg, false)
+	results, err := Organize(dir, cfg, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,7 +129,7 @@ func TestConflictOverwrite(t *testing.T) {
 	dir, _, dest := setupConflictTest(t)
 
 	cfg := makeConfig("overwrite", config.Rule{Extensions: []string{".pdf"}, Destination: dest})
-	results, err := Organize(dir, cfg, false)
+	results, err := Organize(dir, cfg, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,7 +192,7 @@ func TestOrganizeCopyAction(t *testing.T) {
 		Action:      "copy",
 	})
 
-	results, err := Organize(dir, cfg, false)
+	results, err := Organize(dir, cfg, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -232,7 +232,7 @@ func TestOrganizeDeleteAction(t *testing.T) {
 		Action:     "delete",
 	})
 
-	results, err := Organize(dir, cfg, false)
+	results, err := Organize(dir, cfg, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -269,7 +269,7 @@ func TestOrganizeRenameAndDestinationTemplate(t *testing.T) {
 		Action:      "move",
 	})
 
-	results, err := Organize(dir, cfg, false)
+	results, err := Organize(dir, cfg, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -318,7 +318,7 @@ min_size    = "50B"
 		t.Fatal(err)
 	}
 
-	results, err := Organize(dir, cfgParsed, false)
+	results, err := Organize(dir, cfgParsed, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -365,7 +365,7 @@ min_age     = "1h"
 		t.Fatal(err)
 	}
 
-	results, err := Organize(dir, cfgParsed, false)
+	results, err := Organize(dir, cfgParsed, false, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -375,6 +375,71 @@ min_age     = "1h"
 	}
 	if filepath.Base(results[0].Source) != "old.txt" {
 		t.Errorf("expected old.txt to be organized, got %s", filepath.Base(results[0].Source))
+	}
+}
+
+func TestOrganizeRecursive(t *testing.T) {
+	dir := t.TempDir()
+	srcDir := filepath.Join(dir, "source")
+	destDir := filepath.Join(dir, "dest")
+
+	subDir := filepath.Join(srcDir, "subdir1", "subdir2")
+	if err := os.MkdirAll(subDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	srcFile := filepath.Join(subDir, "test.pdf")
+	if err := os.WriteFile(srcFile, []byte("pdfcontent"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := makeConfig("rename", config.Rule{
+		Name:        "Recursive PDF",
+		Extensions:  []string{".pdf"},
+		Destination: destDir,
+		Action:      "move",
+	})
+
+	results, err := Organize(srcDir, cfg, false, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+
+	expectedDest := filepath.Join(destDir, "test.pdf")
+	if results[0].Destination != expectedDest {
+		t.Errorf("expected destination %q, got %q", expectedDest, results[0].Destination)
+	}
+
+	if _, err := os.Stat(expectedDest); os.IsNotExist(err) {
+		t.Error("expected moved file to exist at destination")
+	}
+
+	if _, err := os.Stat(subDir); !os.IsNotExist(err) {
+		t.Error("expected empty subdirectories to be deleted")
+	}
+}
+
+func TestDeleteEmptyDirs(t *testing.T) {
+	dir := t.TempDir()
+	nested := filepath.Join(dir, "a", "b", "c")
+	if err := os.MkdirAll(nested, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := deleteEmptyDirs(dir); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := os.Stat(filepath.Join(dir, "a")); !os.IsNotExist(err) {
+		t.Error("expected empty folder 'a' to be deleted")
+	}
+
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		t.Error("expected root folder to not be deleted")
 	}
 }
 
