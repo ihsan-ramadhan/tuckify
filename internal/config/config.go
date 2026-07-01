@@ -25,6 +25,8 @@ type Rule struct {
 	Extensions       []string `toml:"extensions"`
 	FilenamePatterns []string `toml:"filename_patterns"`
 	Destination      string   `toml:"destination"`
+	Action           string   `toml:"action"`
+	Rename           string   `toml:"rename"`
 }
 
 func DefaultConfigPath() string {
@@ -49,6 +51,16 @@ func Load(path string) (*Config, error) {
 		cfg.Settings.ConflictStrategy = "rename"
 	}
 	for i := range cfg.Rules {
+		if cfg.Rules[i].Action == "" {
+			cfg.Rules[i].Action = "move"
+		}
+		act := cfg.Rules[i].Action
+		if act != "move" && act != "copy" && act != "delete" {
+			return nil, fmt.Errorf("invalid action %q for rule %q", act, cfg.Rules[i].Name)
+		}
+		if (act == "move" || act == "copy") && cfg.Rules[i].Destination == "" {
+			return nil, fmt.Errorf("destination is required for action %q in rule %q", act, cfg.Rules[i].Name)
+		}
 		cfg.Rules[i].Destination = ExpandHome(cfg.Rules[i].Destination)
 	}
 	return &cfg, nil
