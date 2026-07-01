@@ -9,12 +9,17 @@ import (
 func setupTempStore(t *testing.T) func() {
 	t.Helper()
 	tmp := t.TempDir()
-	orig := os.Getenv("HOME")
-	// point storePath() to temp dir by overriding HOME
+	origHome := os.Getenv("HOME")
+	origProfile := os.Getenv("USERPROFILE")
+	// point storePath() to temp dir by overriding HOME and USERPROFILE (for Windows)
 	t.Setenv("HOME", tmp)
+	t.Setenv("USERPROFILE", tmp)
 	// pre-create config dir
 	_ = os.MkdirAll(filepath.Join(tmp, ".config", "tuckify"), 0o755)
-	return func() { _ = os.Setenv("HOME", orig) }
+	return func() {
+		_ = os.Setenv("HOME", origHome)
+		_ = os.Setenv("USERPROFILE", origProfile)
+	}
 }
 
 func TestLoadEmpty(t *testing.T) {
