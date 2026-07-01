@@ -10,10 +10,11 @@
 #   "*_2024.*"  → any file ending with "_2024" before the extension
 
 [settings]
-# Strategy when a file with the same name already exists at the destination.
-# "rename"    → append suffix _1, _2, etc. (default)
-# "skip"      → leave the file, do not move
-# "overwrite" → replace the existing file
+# strategy when a file with the same name already exists at the destination.
+# "rename"           → append suffix _1, _2, etc. (default)
+# "skip"             → leave the file, do not move
+# "overwrite"        → replace the existing file
+# "delete_duplicate" → delete source if content hash matches destination, fallback to rename if different
 conflict_strategy = "rename"
 
 # --- Documents ---
@@ -80,3 +81,18 @@ destination = "~/Downloads/Archives"
 name        = "Installers"
 extensions  = [".exe", ".dmg", ".deb", ".rpm", ".pkg", ".msi", ".appimage"]
 destination = "~/Downloads/Installers"
+
+# --- advanced features (size/age filters, copy/delete actions, renaming with modifiers) ---
+
+[[rule]]
+name        = "archive old reports"
+extensions  = [".pdf", ".docx"]
+destination = "~/Documents/Archives/{year}/{month}"
+rename      = "{base:slug}_archived{ext}"
+min_age     = "30d"
+
+[[rule]]
+name        = "clean up large temp files"
+extensions  = [".log", ".tmp"]
+action      = "delete"
+min_size    = "100MB"
