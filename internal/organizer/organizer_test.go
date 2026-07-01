@@ -291,6 +291,26 @@ func TestOrganizeRenameAndDestinationTemplate(t *testing.T) {
 	}
 }
 
+func runTestOrganize(t *testing.T, dir, tomlContent string) []Result {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "rules.toml")
+	if err := os.WriteFile(path, []byte(tomlContent), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfgParsed, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	results, err := Organize(dir, cfgParsed, false, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	return results
+}
+
 func TestOrganizeSizeFilter(t *testing.T) {
 	dir := t.TempDir()
 	dest := filepath.Join(dir, "dest")
@@ -305,7 +325,6 @@ func TestOrganizeSizeFilter(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	path := filepath.Join(t.TempDir(), "rules.toml")
 	content := `
 [[rule]]
 name        = "Large Files Only"
@@ -313,22 +332,7 @@ extensions  = [".txt"]
 destination = '` + dest + `'
 min_size    = "50B"
 `
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	cfgParsed, err := config.Load(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	results, err := Organize(dir, cfgParsed, false, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if len(results) != 1 {
-		t.Fatalf("expected 1 result, got %d", len(results))
-	}
+	results := runTestOrganize(t, dir, content)
 	if filepath.Base(results[0].Source) != "large.txt" {
 		t.Errorf("expected large.txt to be organized, got %s", filepath.Base(results[0].Source))
 	}
@@ -352,7 +356,6 @@ func TestOrganizeAgeFilter(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	path := filepath.Join(t.TempDir(), "rules.toml")
 	content := `
 [[rule]]
 name        = "Old Files Only"
@@ -360,22 +363,7 @@ extensions  = [".txt"]
 destination = '` + dest + `'
 min_age     = "1h"
 `
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	cfgParsed, err := config.Load(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	results, err := Organize(dir, cfgParsed, false, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if len(results) != 1 {
-		t.Fatalf("expected 1 result, got %d", len(results))
-	}
+	results := runTestOrganize(t, dir, content)
 	if filepath.Base(results[0].Source) != "old.txt" {
 		t.Errorf("expected old.txt to be organized, got %s", filepath.Base(results[0].Source))
 	}

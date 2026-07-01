@@ -244,17 +244,10 @@ func executeFileAction(src, dest, action string) error {
 	return nil
 }
 
-func processFile(src string, rule *config.Rule, conflictStrategy string, info os.FileInfo) (string, error) {
-	if rule.Action == "delete" {
-		if err := os.Remove(src); err != nil {
-			return "", fmt.Errorf("delete file: %w", err)
-		}
-		return "/dev/null", nil
-	}
-
+func buildAndResolveDest(src string, rule *config.Rule, conflictStrategy string, info os.FileInfo) (string, bool, error) {
 	destDir := parseTemplates(rule.Destination, info)
 	if err := os.MkdirAll(destDir, 0o755); err != nil {
-		return "", fmt.Errorf("create destination: %w", err)
+		return "", false, fmt.Errorf("create destination: %w", err)
 	}
 
 	targetName := info.Name()
@@ -267,21 +260,33 @@ func processFile(src string, rule *config.Rule, conflictStrategy string, info os
 		if conflictStrategy == "delete_duplicate" {
 			handled, retDest, err := handleDuplicate(src, dest, rule.Action)
 			if err != nil {
-				return "", err
+				return "", false, err
 			}
 			if handled {
-				return retDest, nil
+				return retDest, true, nil
 			}
 			conflictStrategy = "rename"
 		}
 	}
 
 	resolvedDest, err := resolveDest(destDir, targetName, conflictStrategy)
+	return resolvedDest, false, err
+}
+
+func processFile(src string, rule *config.Rule, conflictStrategy string, info os.FileInfo) (string, error) {
+	if rule.Action == "delete" {
+		if err := os.Remove(src); err != nil {
+			return "", fmt.Errorf("delete file: %w", err)
+		}
+		return "/dev/null", nil
+	}
+
+	resolvedDest, handled, err := buildAndResolveDest(src, rule, conflictStrategy, info)
 	if err != nil {
 		return "", err
 	}
-	if resolvedDest == "" {
-		return "", nil
+	if resolvedDest == "" || handled {
+		return resolvedDest, nil
 	}
 
 	if err := executeFileAction(src, resolvedDest, rule.Action); err != nil {
