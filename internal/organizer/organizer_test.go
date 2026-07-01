@@ -147,3 +147,143 @@ func TestConflictOverwrite(t *testing.T) {
 	}
 }
 
+func TestParseTemplates(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "test_file.txt")
+	if err := os.WriteFile(path, []byte("hello"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cases := []struct {
+		pattern string
+		want    string
+	}{
+		{"{base}_new{ext}", "test_file_new.txt"},
+		{"{year}/{month}/{day}", info.ModTime().Format("2006/01/02")},
+		{"{hour}:{minute}:{second}", info.ModTime().Format("15:04:05")},
+		{"static_text", "static_text"},
+	}
+
+	for _, c := range cases {
+		got := parseTemplates(c.pattern, info)
+		if got != c.want {
+			t.Errorf("parseTemplates(%q) = %q, want %q", c.pattern, got, c.want)
+		}
+	}
+}
+
+func TestOrganizeCopyAction(t *testing.T) {
+	dir := t.TempDir()
+	dest := filepath.Join(dir, "backup")
+
+	src := filepath.Join(dir, "test.pdf")
+	if err := os.WriteFile(src, []byte("pdfcontent"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := makeConfig("rename", config.Rule{
+		Name:        "Copy PDF",
+		Extensions:  []string{".pdf"},
+		Destination: dest,
+		Action:      "copy",
+	})
+
+	results, err := Organize(dir, cfg, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+
+	if _, err := os.Stat(src); os.IsNotExist(err) {
+		t.Error("source file should not be deleted for copy action")
+	}
+
+	destFile := filepath.Join(dest, "test.pdf")
+	if _, err := os.Stat(destFile); os.IsNotExist(err) {
+		t.Error("destination file should exist for copy action")
+	}
+
+	data, err := os.ReadFile(destFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "pdfcontent" {
+		t.Errorf("expected copied content to be 'pdfcontent', got %q", string(data))
+	}
+}
+
+func TestOrganizeDeleteAction(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "test.tmp")
+	if err := os.WriteFile(src, []byte("junk"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := makeConfig("rename", config.Rule{
+		Name:       "Delete Temp",
+		Extensions: []string{".tmp"},
+		Action:     "delete",
+	})
+
+	results, err := Organize(dir, cfg, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+
+	if _, err := os.Stat(src); !os.IsNotExist(err) {
+		t.Error("source file should be deleted for delete action")
+	}
+}
+
+func TestOrganizeRenameAndDestinationTemplate(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "report.pdf")
+	if err := os.WriteFile(src, []byte("content"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	info, err := os.Stat(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	year := info.ModTime().Format("2006")
+	month := info.ModTime().Format("01")
+
+	destDir := filepath.Join(dir, year, month)
+	cfg := makeConfig("rename", config.Rule{
+		Name:        "Template Rule",
+		Extensions:  []string{".pdf"},
+		Destination: filepath.Join(dir, "{year}", "{month}"),
+		Rename:      "renamed_{base}{ext}",
+		Action:      "move",
+	})
+
+	results, err := Organize(dir, cfg, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+
+	expectedDest := filepath.Join(destDir, "renamed_report.pdf")
+	if results[0].Destination != expectedDest {
+		t.Errorf("expected destination %q, got %q", expectedDest, results[0].Destination)
+	}
+
+	if _, err := os.Stat(expectedDest); os.IsNotExist(err) {
+		t.Error("expected moved file to exist at templated destination")
+	}
+}
+

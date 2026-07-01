@@ -35,21 +35,68 @@ var runCmd = &cobra.Command{
 		}
 
 		moved := 0
+		copied := 0
+		deleted := 0
 		for _, r := range results {
 			if r.Skipped {
 				color.Yellow("skipped %s: %s", r.Source, r.SkipReason)
 				continue
 			}
+
+			actionVerb := "moved"
+			switch r.Action {
+			case "copy":
+				actionVerb = "copied"
+			case "delete":
+				actionVerb = "deleted"
+			}
+
 			if dryRun {
-				fmt.Printf("[dry-run] %q → %s\n", r.Source, r.Destination)
+				if r.Action == "delete" {
+					fmt.Printf("[dry-run] delete %q\n", r.Source)
+				} else {
+					act := r.Action
+					if act == "" {
+						act = "move"
+					}
+					fmt.Printf("[dry-run] %s %q → %s\n", act, r.Source, r.Destination)
+				}
 			} else {
-				fmt.Printf("moved %q → %s\n", r.Source, r.Destination)
-				moved++
+				if r.Action == "delete" {
+					fmt.Printf("deleted %q\n", r.Source)
+					deleted++
+				} else {
+					fmt.Printf("%s %q → %s\n", actionVerb, r.Source, r.Destination)
+					if r.Action == "copy" {
+						copied++
+					} else {
+						moved++
+					}
+				}
 			}
 		}
 
 		if !dryRun {
-			fmt.Printf("\n%d file(s) moved\n", moved)
+			summary := ""
+			if moved > 0 {
+				summary += fmt.Sprintf("%d file(s) moved", moved)
+			}
+			if copied > 0 {
+				if summary != "" {
+					summary += ", "
+				}
+				summary += fmt.Sprintf("%d file(s) copied", copied)
+			}
+			if deleted > 0 {
+				if summary != "" {
+					summary += ", "
+				}
+				summary += fmt.Sprintf("%d file(s) deleted", deleted)
+			}
+			if summary == "" {
+				summary = "0 file(s) processed"
+			}
+			fmt.Printf("\n%s\n", summary)
 		}
 		return nil
 	},
