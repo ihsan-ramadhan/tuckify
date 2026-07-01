@@ -56,7 +56,7 @@ var listCmd = &cobra.Command{
 			strings.Repeat("─", wCron) + "┼" +
 			strings.Repeat("─", wFolder)
 
-		colHeader.Printf(" %-*s│ %-*s│ %-*s│ %-*s│ %s\n",
+		_, _ = colHeader.Printf(" %-*s│ %-*s│ %-*s│ %-*s│ %s\n",
 			wName-1, "NAME",
 			wStatus-1, "STATUS",
 			wSaved-1, "SAVED",
@@ -89,9 +89,9 @@ var listCmd = &cobra.Command{
 		if len(unsaved) > 0 {
 			fmt.Println()
 			for _, name := range unsaved {
-				colHint.Printf("  ! %q not active — run 'tuckify start %s'\n", name, name)
+				_, _ = colHint.Printf("  ! %q not active — run 'tuckify start %s'\n", name, name)
 			}
-			colHint.Println("  To activate all at once: tuckify startup")
+			_, _ = colHint.Println("  To activate all at once: tuckify startup")
 		}
 
 		return nil

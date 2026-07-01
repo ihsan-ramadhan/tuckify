@@ -18,12 +18,15 @@ type Result struct {
 
 func MatchRule(filename string, rules []config.Rule) *config.Rule {
 	ext := strings.ToLower(filepath.Ext(filename))
-	if ext == "" {
-		return nil
-	}
+	lower := strings.ToLower(filename)
 	for i := range rules {
 		for _, e := range rules[i].Extensions {
-			if strings.ToLower(e) == ext {
+			if ext != "" && strings.ToLower(e) == ext {
+				return &rules[i]
+			}
+		}
+		for _, pattern := range rules[i].FilenamePatterns {
+			if matched, _ := filepath.Match(strings.ToLower(pattern), lower); matched {
 				return &rules[i]
 			}
 		}
@@ -97,7 +100,7 @@ func Organize(folder string, cfg *config.Config, dryRun bool) ([]Result, error) 
 			})
 			continue
 		} else {
-			f.Close()
+			_ = f.Close()
 		}
 
 		if dryRun {
@@ -114,6 +117,14 @@ func Organize(folder string, cfg *config.Config, dryRun bool) ([]Result, error) 
 				Source:     src,
 				Skipped:    true,
 				SkipReason: err.Error(),
+			})
+			continue
+		}
+		if dest == "" {
+			results = append(results, Result{
+				Source:     src,
+				Skipped:    true,
+				SkipReason: "file already exists",
 			})
 			continue
 		}

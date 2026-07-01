@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -12,11 +13,31 @@ import (
 	"github.com/robfig/cron/v3"
 )
 
-func Run(folder, expr string, cfg *config.Config) error {
+func ResolveConfigPath(name, configPath string) string {
+	if configPath != "" {
+		return configPath
+	}
+	home, err := os.UserHomeDir()
+	if err == nil {
+		custom := filepath.Join(home, ".tuckify", name+".toml")
+		if _, err := os.Stat(custom); err == nil {
+			return custom
+		}
+	}
+	return config.DefaultConfigPath()
+}
+
+func Run(name, folder, expr, configPath string) error {
 	c := cron.New()
 
 	_, err := c.AddFunc(expr, func() {
 		fmt.Printf("[%s] running organizer on %s\n", time.Now().Format("2006-01-02 15:04:05"), folder)
+		actualPath := ResolveConfigPath(name, configPath)
+		cfg, err := config.Load(actualPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error loading config: %v\n", err)
+			return
+		}
 		results, err := organizer.Organize(folder, cfg, false)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)

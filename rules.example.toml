@@ -4,6 +4,10 @@
 # Rules are executed top to bottom.
 # Each file matches the first rule that fits — no multiple matches.
 # Extension matching is case-insensitive (.PDF == .pdf).
+# Filename patterns use glob syntax: * matches any characters.
+#   "*Modul*"   → any file containing "Modul"
+#   "Invoice_*" → any file starting with "Invoice_"
+#   "*_2024.*"  → any file ending with "_2024" before the extension
 
 [settings]
 # Strategy when a file with the same name already exists at the destination.
@@ -52,6 +56,18 @@ destination = "~/Videos"
 name        = "Audio"
 extensions  = [".mp3", ".wav", ".flac", ".aac", ".ogg"]
 destination = "~/Music"
+
+# --- Filename patterns ---
+
+[[rule]]
+name              = "Modul files"
+filename_patterns = ["*modul*", "*Modul*"]
+destination       = "~/Documents/Modul"
+
+[[rule]]
+name              = "Invoices"
+filename_patterns = ["Invoice_*", "invoice_*"]
+destination       = "~/Documents/Invoices"
 
 # --- Downloads ---
 

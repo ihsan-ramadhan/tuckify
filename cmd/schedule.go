@@ -54,22 +54,23 @@ var scheduleCmd = &cobra.Command{
 		fmt.Printf("saved schedule %q\n", name)
 		fmt.Printf("  run 'tuckify start %s' to activate as a background service\n", name)
 
-		cfg, err := config.Load(configPath)
+		actualConfigPath := scheduler.ResolveConfigPath(name, absConfig)
+		cfg, err := config.Load(actualConfigPath)
 		if err != nil {
 			return err
 		}
-		warnNoRules(cfg, configPath)
+		warnNoRules(cfg, actualConfigPath)
 
 		if !scheduleRun {
 			return nil
 		}
-		return scheduler.Run(folder, cronExpr, cfg)
+		return scheduler.Run(name, folder, cronExpr, absConfig)
 	},
 }
 
 func init() {
 	scheduleCmd.Flags().StringVar(&cronExpr, "cron", "", `cron expression, e.g. "0 9 * * *"`)
 	scheduleCmd.Flags().BoolVar(&scheduleRun, "run", false, "also start interactive scheduler after saving")
-	scheduleCmd.MarkFlagRequired("cron")
+	_ = scheduleCmd.MarkFlagRequired("cron")
 	rootCmd.AddCommand(scheduleCmd)
 }

@@ -48,7 +48,7 @@ Description=tuckify file organizer (downloads)
 After=default.target
 
 [Service]
-ExecStart=/usr/bin/tuckify schedule downloads /data --cron "0 9 * * *" --config /etc/tuckify.toml
+ExecStart=/usr/bin/tuckify schedule downloads /data --cron "0 9 * * *" --run --config /etc/tuckify.toml
 Restart=on-failure
 RestartSec=5s
 
@@ -65,7 +65,7 @@ Description=tuckify file organizer (downloads)
 After=default.target
 
 [Service]
-ExecStart=/usr/bin/tuckify schedule downloads /data --cron "0 9 * * *"
+ExecStart=/usr/bin/tuckify schedule downloads /data --cron "0 9 * * *" --run
 Restart=on-failure
 RestartSec=5s
 
@@ -99,6 +99,7 @@ func TestLaunchdContent(t *testing.T) {
         <string>/data</string>
         <string>--cron</string>
         <string>0 9 * * *</string>
+        <string>--run</string>
         <string>--config</string>
         <string>/etc/tuckify.toml</string>
     </array>
@@ -128,6 +129,7 @@ func TestLaunchdContent(t *testing.T) {
         <string>/data</string>
         <string>--cron</string>
         <string>0 9 * * *</string>
+        <string>--run</string>
     </array>
     <key>KeepAlive</key>
     <true/>
@@ -206,13 +208,13 @@ func TestWintaskCmd(t *testing.T) {
 	cfgPath := `C:\config.toml`
 
 	cmd := buildWintaskCmd(name, binary, folder, cronExpr, cfgPath)
-	expected := `"` + binary + `" schedule "` + name + `" "` + folder + `" --cron "` + cronExpr + `"` + ` --config "` + cfgPath + `"`
+	expected := `"` + binary + `" schedule "` + name + `" "` + folder + `" --cron "` + cronExpr + `" --run` + ` --config "` + cfgPath + `"`
 	if cmd != expected {
 		t.Errorf("expected %q, got %q", expected, cmd)
 	}
 
 	cmdNoCfg := buildWintaskCmd(name, binary, folder, cronExpr, "")
-	expectedNoCfg := `"` + binary + `" schedule "` + name + `" "` + folder + `" --cron "` + cronExpr + `"`
+	expectedNoCfg := `"` + binary + `" schedule "` + name + `" "` + folder + `" --cron "` + cronExpr + `" --run`
 	if cmdNoCfg != expectedNoCfg {
 		t.Errorf("expected %q, got %q", expectedNoCfg, cmdNoCfg)
 	}

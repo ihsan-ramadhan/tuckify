@@ -9,12 +9,17 @@ import (
 func setupTempStore(t *testing.T) func() {
 	t.Helper()
 	tmp := t.TempDir()
-	orig := os.Getenv("HOME")
-	// point storePath() to temp dir by overriding HOME
+	origHome := os.Getenv("HOME")
+	origProfile := os.Getenv("USERPROFILE")
+	// point storePath() to temp dir by overriding HOME and USERPROFILE (for Windows)
 	t.Setenv("HOME", tmp)
+	t.Setenv("USERPROFILE", tmp)
 	// pre-create config dir
 	_ = os.MkdirAll(filepath.Join(tmp, ".config", "tuckify"), 0o755)
-	return func() { os.Setenv("HOME", orig) }
+	return func() {
+		_ = os.Setenv("HOME", origHome)
+		_ = os.Setenv("USERPROFILE", origProfile)
+	}
 }
 
 func TestLoadEmpty(t *testing.T) {
@@ -84,3 +89,27 @@ func TestDelete(t *testing.T) {
 		t.Error("expected found=false for nonexistent")
 	}
 }
+
+func TestFind(t *testing.T) {
+	defer setupTempStore(t)()
+
+	s := Schedule{Name: "downloads", Folder: "/data", Cron: "0 9 * * *"}
+	_ = Upsert(s)
+
+	found, err := Find("downloads")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if found == nil || *found != s {
+		t.Errorf("expected to find %v, got %v", s, found)
+	}
+
+	notFound, err := Find("nonexistent")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if notFound != nil {
+		t.Errorf("expected nil for nonexistent, got %v", notFound)
+	}
+}
+

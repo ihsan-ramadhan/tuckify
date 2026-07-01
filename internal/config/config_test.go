@@ -65,4 +65,18 @@ func TestExpandHomeNoPrefix(t *testing.T) {
 	if got := ExpandHome("/abs/path"); got != "/abs/path" {
 		t.Errorf("got %q, want unchanged", got)
 	}
+
+	home, _ := os.UserHomeDir()
+	if got := ExpandHome("~"); got != home {
+		t.Errorf("got %q, want %q", got, home)
+	}
 }
+
+func TestLoadDirectoryError(t *testing.T) {
+	dir := t.TempDir()
+	_, err := Load(dir)
+	if err == nil {
+		t.Error("expected error when loading directory as config, got nil")
+	}
+}
+

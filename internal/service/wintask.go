@@ -6,7 +6,10 @@ import (
 	"os/exec"
 )
 
-const schtasksCmd = "schtasks"
+const (
+	schtasksCmd   = "schtasks"
+	wintaskPrefix = "tuckify-"
+)
 
 type WintaskService struct{}
 
@@ -21,7 +24,7 @@ func (w *WintaskService) Install(name, folder, cronExpr, configPath string) erro
 	}
 
 	execCmd := buildWintaskCmd(name, binaryPath, folder, cronExpr, configPath)
-	taskName := "tuckify-" + name
+	taskName := wintaskPrefix + name
 
 	winSch, err := exec.LookPath(schtasksCmd)
 	if err != nil {
@@ -44,7 +47,7 @@ func (w *WintaskService) Uninstall(name string) error {
 
 	taskName := "tuckify"
 	if name != "" {
-		taskName = "tuckify-" + name
+		taskName = wintaskPrefix + name
 	}
 
 	_ = exec.Command(winSch, "/delete", "/tn", taskName, "/f").Run()
@@ -57,7 +60,7 @@ func (w *WintaskService) Exists(name string) (bool, error) {
 		return false, fmt.Errorf("find schtasks: %w", err)
 	}
 
-	taskName := "tuckify-" + name
+	taskName := wintaskPrefix + name
 	if err := exec.Command(winSch, "/query", "/tn", taskName).Run(); err != nil {
 		return false, nil
 	}
@@ -73,7 +76,7 @@ func (w *WintaskService) Logs(name string, follow bool, lines int) error {
 }
 
 func buildWintaskCmd(name, binaryPath, folder, cronExpr, configPath string) string {
-	execCmd := fmt.Sprintf(`"%s" schedule "%s" "%s" --cron "%s"`, binaryPath, name, folder, cronExpr)
+	execCmd := fmt.Sprintf(`"%s" schedule "%s" "%s" --cron "%s" --run`, binaryPath, name, folder, cronExpr)
 	if configPath != "" {
 		execCmd += fmt.Sprintf(` --config "%s"`, configPath)
 	}
