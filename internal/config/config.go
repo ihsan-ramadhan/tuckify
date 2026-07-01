@@ -146,6 +146,50 @@ func DefaultConfigPath() string {
 	return ExpandHome("~/.tuckify/rules.toml")
 }
 
+func validateAndParseRule(r *Rule) error {
+	if r.Action == "" {
+		r.Action = "move"
+	}
+	act := r.Action
+	if act != "move" && act != "copy" && act != "delete" {
+		return fmt.Errorf("invalid action %q", act)
+	}
+	if (act == "move" || act == "copy") && r.Destination == "" {
+		return fmt.Errorf("destination is required for action %q", act)
+	}
+	r.Destination = ExpandHome(r.Destination)
+
+	if r.MinSize != "" {
+		sz, err := parseSizeString(r.MinSize)
+		if err != nil {
+			return fmt.Errorf("invalid min_size: %w", err)
+		}
+		r.minSizeBytes = &sz
+	}
+	if r.MaxSize != "" {
+		sz, err := parseSizeString(r.MaxSize)
+		if err != nil {
+			return fmt.Errorf("invalid max_size: %w", err)
+		}
+		r.maxSizeBytes = &sz
+	}
+	if r.MinAge != "" {
+		age, err := parseAgeString(r.MinAge)
+		if err != nil {
+			return fmt.Errorf("invalid min_age: %w", err)
+		}
+		r.minAgeDuration = &age
+	}
+	if r.MaxAge != "" {
+		age, err := parseAgeString(r.MaxAge)
+		if err != nil {
+			return fmt.Errorf("invalid max_age: %w", err)
+		}
+		r.maxAgeDuration = &age
+	}
+	return nil
+}
+
 func Load(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -164,45 +208,8 @@ func Load(path string) (*Config, error) {
 		cfg.Settings.ConflictStrategy = "rename"
 	}
 	for i := range cfg.Rules {
-		if cfg.Rules[i].Action == "" {
-			cfg.Rules[i].Action = "move"
-		}
-		act := cfg.Rules[i].Action
-		if act != "move" && act != "copy" && act != "delete" {
-			return nil, fmt.Errorf("invalid action %q for rule %q", act, cfg.Rules[i].Name)
-		}
-		if (act == "move" || act == "copy") && cfg.Rules[i].Destination == "" {
-			return nil, fmt.Errorf("destination is required for action %q in rule %q", act, cfg.Rules[i].Name)
-		}
-		cfg.Rules[i].Destination = ExpandHome(cfg.Rules[i].Destination)
-
-		if cfg.Rules[i].MinSize != "" {
-			sz, err := parseSizeString(cfg.Rules[i].MinSize)
-			if err != nil {
-				return nil, fmt.Errorf("rule %q: invalid min_size: %w", cfg.Rules[i].Name, err)
-			}
-			cfg.Rules[i].minSizeBytes = &sz
-		}
-		if cfg.Rules[i].MaxSize != "" {
-			sz, err := parseSizeString(cfg.Rules[i].MaxSize)
-			if err != nil {
-				return nil, fmt.Errorf("rule %q: invalid max_size: %w", cfg.Rules[i].Name, err)
-			}
-			cfg.Rules[i].maxSizeBytes = &sz
-		}
-		if cfg.Rules[i].MinAge != "" {
-			age, err := parseAgeString(cfg.Rules[i].MinAge)
-			if err != nil {
-				return nil, fmt.Errorf("rule %q: invalid min_age: %w", cfg.Rules[i].Name, err)
-			}
-			cfg.Rules[i].minAgeDuration = &age
-		}
-		if cfg.Rules[i].MaxAge != "" {
-			age, err := parseAgeString(cfg.Rules[i].MaxAge)
-			if err != nil {
-				return nil, fmt.Errorf("rule %q: invalid max_age: %w", cfg.Rules[i].Name, err)
-			}
-			cfg.Rules[i].maxAgeDuration = &age
+		if err := validateAndParseRule(&cfg.Rules[i]); err != nil {
+			return nil, fmt.Errorf("rule %q: %w", cfg.Rules[i].Name, err)
 		}
 	}
 	return &cfg, nil

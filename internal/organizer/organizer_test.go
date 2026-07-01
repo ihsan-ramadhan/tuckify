@@ -310,7 +310,7 @@ func TestOrganizeSizeFilter(t *testing.T) {
 [[rule]]
 name        = "Large Files Only"
 extensions  = [".txt"]
-destination = "` + dest + `"
+destination = '` + dest + `'
 min_size    = "50B"
 `
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
@@ -357,7 +357,7 @@ func TestOrganizeAgeFilter(t *testing.T) {
 [[rule]]
 name        = "Old Files Only"
 extensions  = [".txt"]
-destination = "` + dest + `"
+destination = '` + dest + `'
 min_age     = "1h"
 `
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
@@ -446,7 +446,8 @@ func TestDeleteEmptyDirs(t *testing.T) {
 	}
 }
 
-func TestOrganizeDuplicateDetection(t *testing.T) {
+func setupDuplicateTestDirs(t *testing.T) (string, string) {
+	t.Helper()
 	dir := t.TempDir()
 	srcDir := filepath.Join(dir, "src")
 	destDir := filepath.Join(dir, "dest")
@@ -456,6 +457,11 @@ func TestOrganizeDuplicateDetection(t *testing.T) {
 	if err := os.MkdirAll(destDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
+	return srcDir, destDir
+}
+
+func TestOrganizeDuplicateDetection(t *testing.T) {
+	srcDir, destDir := setupDuplicateTestDirs(t)
 
 	content := []byte("identical-content")
 	src := filepath.Join(srcDir, "a.pdf")
@@ -493,15 +499,7 @@ func TestOrganizeDuplicateDetection(t *testing.T) {
 }
 
 func TestOrganizeDuplicateDetectionDifferentContent(t *testing.T) {
-	dir := t.TempDir()
-	srcDir := filepath.Join(dir, "src")
-	destDir := filepath.Join(dir, "dest")
-	if err := os.MkdirAll(srcDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.MkdirAll(destDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
+	srcDir, destDir := setupDuplicateTestDirs(t)
 
 	src := filepath.Join(srcDir, "a.pdf")
 	dest := filepath.Join(destDir, "a.pdf")
