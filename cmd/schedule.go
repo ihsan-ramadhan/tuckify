@@ -14,6 +14,7 @@ import (
 
 var cronExpr string
 var scheduleRun bool
+var scheduleRecursive bool
 
 var scheduleCmd = &cobra.Command{
 	Use:   "schedule <name> <folder>",
@@ -43,10 +44,11 @@ var scheduleCmd = &cobra.Command{
 		}
 
 		if err := store.Upsert(store.Schedule{
-			Name:   name,
-			Folder: folder,
-			Cron:   cronExpr,
-			Config: absConfig,
+			Name:      name,
+			Folder:    folder,
+			Cron:      cronExpr,
+			Config:    absConfig,
+			Recursive: scheduleRecursive,
 		}); err != nil {
 			return fmt.Errorf("save schedule: %w", err)
 		}
@@ -71,6 +73,7 @@ var scheduleCmd = &cobra.Command{
 func init() {
 	scheduleCmd.Flags().StringVar(&cronExpr, "cron", "", `cron expression, e.g. "0 9 * * *"`)
 	scheduleCmd.Flags().BoolVar(&scheduleRun, "run", false, "also start interactive scheduler after saving")
+	scheduleCmd.Flags().BoolVarP(&scheduleRecursive, "recursive", "r", false, "organize subfolders recursively")
 	_ = scheduleCmd.MarkFlagRequired("cron")
 	rootCmd.AddCommand(scheduleCmd)
 }
