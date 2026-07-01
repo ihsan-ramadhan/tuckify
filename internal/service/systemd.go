@@ -142,7 +142,7 @@ func (s *SystemdService) Logs(name string, follow bool, lines int) error {
 }
 
 func buildSystemdContent(name, binaryPath, folder, cronExpr, configPath string) string {
-	execStart := fmt.Sprintf("%s schedule %s %s --cron %q", binaryPath, name, folder, cronExpr)
+	execStart := fmt.Sprintf("%s schedule %s %s --cron %q --run", binaryPath, name, folder, cronExpr)
 	if configPath != "" {
 		execStart += fmt.Sprintf(" --config %s", configPath)
 	}

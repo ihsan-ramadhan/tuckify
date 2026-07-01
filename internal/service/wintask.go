@@ -76,7 +76,7 @@ func (w *WintaskService) Logs(name string, follow bool, lines int) error {
 }
 
 func buildWintaskCmd(name, binaryPath, folder, cronExpr, configPath string) string {
-	execCmd := fmt.Sprintf(`"%s" schedule "%s" "%s" --cron "%s"`, binaryPath, name, folder, cronExpr)
+	execCmd := fmt.Sprintf(`"%s" schedule "%s" "%s" --cron "%s" --run`, binaryPath, name, folder, cronExpr)
 	if configPath != "" {
 		execCmd += fmt.Sprintf(` --config "%s"`, configPath)
 	}

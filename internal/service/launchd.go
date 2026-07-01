@@ -130,6 +130,7 @@ func buildLaunchdContent(name, binaryPath, folder, cronExpr, configPath string) 
         <string>%s</string>
         <string>--cron</string>
         <string>%s</string>
+        <string>--run</string>
 `, binaryPath, name, folder, cronExpr)
 
 	if configPath != "" {
