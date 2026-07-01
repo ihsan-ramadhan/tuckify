@@ -101,3 +101,57 @@ func TestDryRun(t *testing.T) {
 		t.Error("dry-run must not move the file")
 	}
 }
+
+func TestConflictSkip(t *testing.T) {
+	dir := t.TempDir()
+	dest := filepath.Join(dir, "dest")
+	_ = os.MkdirAll(dest, 0o755)
+
+	_ = os.WriteFile(filepath.Join(dest, "a.pdf"), []byte("orig"), 0o644)
+
+	src := filepath.Join(dir, "a.pdf")
+	_ = os.WriteFile(src, []byte("new"), 0o644)
+
+	cfg := makeConfig("skip", config.Rule{Extensions: []string{".pdf"}, Destination: dest})
+	results, err := Organize(dir, cfg, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if !results[0].Skipped {
+		t.Error("expected result to be skipped")
+	}
+}
+
+func TestConflictOverwrite(t *testing.T) {
+	dir := t.TempDir()
+	dest := filepath.Join(dir, "dest")
+	_ = os.MkdirAll(dest, 0o755)
+
+	_ = os.WriteFile(filepath.Join(dest, "a.pdf"), []byte("orig"), 0o644)
+
+	src := filepath.Join(dir, "a.pdf")
+	_ = os.WriteFile(src, []byte("new"), 0o644)
+
+	cfg := makeConfig("overwrite", config.Rule{Extensions: []string{".pdf"}, Destination: dest})
+	results, err := Organize(dir, cfg, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if results[0].Skipped {
+		t.Error("expected result not to be skipped")
+	}
+	if filepath.Base(results[0].Destination) != "a.pdf" {
+		t.Errorf("expected destination to be a.pdf, got %s", filepath.Base(results[0].Destination))
+	}
+	data, _ := os.ReadFile(results[0].Destination)
+	if string(data) != "new" {
+		t.Errorf("expected overwrite content to be 'new', got %q", string(data))
+	}
+}
+

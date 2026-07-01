@@ -84,3 +84,27 @@ func TestDelete(t *testing.T) {
 		t.Error("expected found=false for nonexistent")
 	}
 }
+
+func TestFind(t *testing.T) {
+	defer setupTempStore(t)()
+
+	s := Schedule{Name: "downloads", Folder: "/data", Cron: "0 9 * * *"}
+	_ = Upsert(s)
+
+	found, err := Find("downloads")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if found == nil || *found != s {
+		t.Errorf("expected to find %v, got %v", s, found)
+	}
+
+	notFound, err := Find("nonexistent")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if notFound != nil {
+		t.Errorf("expected nil for nonexistent, got %v", notFound)
+	}
+}
+

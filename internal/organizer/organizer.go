@@ -120,6 +120,14 @@ func Organize(folder string, cfg *config.Config, dryRun bool) ([]Result, error) 
 			})
 			continue
 		}
+		if dest == "" {
+			results = append(results, Result{
+				Source:     src,
+				Skipped:    true,
+				SkipReason: "file already exists",
+			})
+			continue
+		}
 		results = append(results, Result{Source: src, Destination: dest})
 	}
 	return results, nil
