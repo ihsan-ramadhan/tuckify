@@ -81,10 +81,10 @@ tuckify list
 ## Usage
 
 ```
-tuckify run <folder> [--dry-run] [--config <path>]
-tuckify schedule <name> <folder> --cron "<expr>" [--run] [--config <path>]
+tuckify run <folder> [--dry-run] [--config <path>] [-r|--recursive] [-y|--yes]
+tuckify schedule <name> <folder> --cron "<expr>" [--run] [--config <path>] [-r|--recursive]
 tuckify list
-tuckify edit <name> [--cron <expr>] [--folder <folder>] [--config <path>]
+tuckify edit <name> [--cron <expr>] [--folder <folder>] [--config <path>] [-r|--recursive <bool>]
 tuckify start <name>
 tuckify stop <name>
 tuckify restart <name>
@@ -162,20 +162,36 @@ Default path: `~/.tuckify/rules.toml`
 
 ```toml
 [settings]
-conflict_strategy = "rename"   # "rename" | "skip" | "overwrite"
+# conflict strategy options: "rename" | "skip" | "overwrite" | "delete_duplicate"
+conflict_strategy = "rename"
 
 [[rule]]
-name        = "By extension"
+name        = "by extension (default move)"
 extensions  = [".pdf", ".docx"]
 destination = "~/Documents"
 
 [[rule]]
-name              = "By filename"
-filename_patterns = ["*Modul*", "Invoice_*"]
+name              = "by filename and copy"
+filename_patterns = ["*modul*", "invoice_*"]
 destination       = "~/Documents/Sorted"
+action            = "copy"
+
+[[rule]]
+name        = "by age and size filters with renaming and modifiers"
+extensions  = [".log", ".tmp"]
+destination = "~/Archives/{year}/{month}"
+rename      = "{base:slug}_old{ext}"
+min_age     = "30d"
+max_size    = "100MB"
+
+[[rule]]
+name        = "delete large installers"
+extensions  = [".exe", ".dmg"]
+action      = "delete"
+min_size    = "500MB"
 ```
 
-A rule can have `extensions`, `filename_patterns`, or both — a file matches if either condition is met.
+A rule can have `extensions`, `filename_patterns`, or both — a file matches if either condition is met. Additional boundaries like size and age can be added using size/age filters.
 
 Filename patterns use glob syntax (`*` matches any characters, case-insensitive):
 - `"*Modul*"` — any file containing "Modul"
@@ -190,6 +206,9 @@ Filename patterns use glob syntax (`*` matches any characters, case-insensitive)
 - Files without an extension can match via `filename_patterns`
 - Missing destination folders are created automatically
 - Default conflict strategy `rename`: appends `_1`, `_2`, etc.
+- If `delete_duplicate` conflict strategy is chosen, files are checked using their SHA-256 hash. If they are duplicates, the source file is deleted (for moves) or skipped (for copies).
+- When `--recursive` / `-r` is used, empty directories left in the source directory are automatically deleted.
+- Deletion rules require interactive confirmation during manual runs, which can be bypassed using the `--yes` / `-y` flag.
 
 ---
 

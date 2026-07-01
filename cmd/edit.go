@@ -64,8 +64,14 @@ var editCmd = &cobra.Command{
 			updated.Config = abs
 		}
 
+		if cmd.Flags().Changed("recursive") {
+			newRec, _ := cmd.Flags().GetBool("recursive")
+			changed["recursive"] = [2]string{fmt.Sprintf("%t", updated.Recursive), fmt.Sprintf("%t", newRec)}
+			updated.Recursive = newRec
+		}
+
 		if len(changed) == 0 {
-			fmt.Printf("nothing to update for %q — use --cron, --folder, or --config\n", name)
+			fmt.Printf("nothing to update for %q — use --cron, --folder, --config, or --recursive\n", name)
 			return nil
 		}
 
@@ -78,7 +84,6 @@ var editCmd = &cobra.Command{
 			fmt.Printf("  %s: %s → %s\n", field, vals[0], vals[1])
 		}
 
-		// restart service if online
 		srv, err := service.NewService()
 		if err != nil {
 			return err
@@ -102,5 +107,6 @@ func init() {
 	editCmd.Flags().String("cron", "", `new cron expression, e.g. "0 9 * * *"`)
 	editCmd.Flags().String("folder", "", "new folder path")
 	editCmd.Flags().String("config", "", "new config path")
+	editCmd.Flags().BoolP("recursive", "r", false, "toggle recursive mode (true/false)")
 	rootCmd.AddCommand(editCmd)
 }

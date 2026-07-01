@@ -7,10 +7,11 @@ import (
 )
 
 type Schedule struct {
-	Name   string `json:"name"`
-	Folder string `json:"folder"`
-	Cron   string `json:"cron"`
-	Config string `json:"config,omitempty"`
+	Name      string `json:"name"`
+	Folder    string `json:"folder"`
+	Cron      string `json:"cron"`
+	Config    string `json:"config,omitempty"`
+	Recursive bool   `json:"recursive,omitempty"`
 }
 
 func storePath() string {
