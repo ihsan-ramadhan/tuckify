@@ -61,15 +61,21 @@ func TestMatchRuleFilenamePattern(t *testing.T) {
 	}
 }
 
-func TestConflictRename(t *testing.T) {
-	dir := t.TempDir()
-	dest := filepath.Join(dir, "dest")
+func setupConflictTest(t *testing.T) (dir, src, dest string) {
+	t.Helper()
+	dir = t.TempDir()
+	dest = filepath.Join(dir, "dest")
 	_ = os.MkdirAll(dest, 0o755)
 
 	_ = os.WriteFile(filepath.Join(dest, "a.pdf"), []byte("orig"), 0o644)
 
-	src := filepath.Join(dir, "a.pdf")
+	src = filepath.Join(dir, "a.pdf")
 	_ = os.WriteFile(src, []byte("new"), 0o644)
+	return dir, src, dest
+}
+
+func TestConflictRename(t *testing.T) {
+	dir, _, dest := setupConflictTest(t)
 
 	cfg := makeConfig("rename", config.Rule{Extensions: []string{".pdf"}, Destination: dest})
 	results, err := Organize(dir, cfg, false)
@@ -103,14 +109,7 @@ func TestDryRun(t *testing.T) {
 }
 
 func TestConflictSkip(t *testing.T) {
-	dir := t.TempDir()
-	dest := filepath.Join(dir, "dest")
-	_ = os.MkdirAll(dest, 0o755)
-
-	_ = os.WriteFile(filepath.Join(dest, "a.pdf"), []byte("orig"), 0o644)
-
-	src := filepath.Join(dir, "a.pdf")
-	_ = os.WriteFile(src, []byte("new"), 0o644)
+	dir, _, dest := setupConflictTest(t)
 
 	cfg := makeConfig("skip", config.Rule{Extensions: []string{".pdf"}, Destination: dest})
 	results, err := Organize(dir, cfg, false)
@@ -126,14 +125,7 @@ func TestConflictSkip(t *testing.T) {
 }
 
 func TestConflictOverwrite(t *testing.T) {
-	dir := t.TempDir()
-	dest := filepath.Join(dir, "dest")
-	_ = os.MkdirAll(dest, 0o755)
-
-	_ = os.WriteFile(filepath.Join(dest, "a.pdf"), []byte("orig"), 0o644)
-
-	src := filepath.Join(dir, "a.pdf")
-	_ = os.WriteFile(src, []byte("new"), 0o644)
+	dir, _, dest := setupConflictTest(t)
 
 	cfg := makeConfig("overwrite", config.Rule{Extensions: []string{".pdf"}, Destination: dest})
 	results, err := Organize(dir, cfg, false)
