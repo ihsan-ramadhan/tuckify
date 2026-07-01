@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/fatih/color"
 	"github.com/ihsan-ramadhan/tuckify/internal/config"
@@ -10,7 +11,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var dryRun bool
+var (
+	dryRun    bool
+	recursive bool
+	yesFlag   bool
+)
 
 var runCmd = &cobra.Command{
 	Use:   "run <folder>",
@@ -29,7 +34,32 @@ var runCmd = &cobra.Command{
 		}
 		warnNoRules(cfg, configPath)
 
-		results, err := organizer.Organize(folder, cfg, dryRun)
+		if !dryRun && !yesFlag {
+			previewResults, err := organizer.Organize(folder, cfg, true, recursive)
+			if err != nil {
+				return err
+			}
+			deletions := 0
+			for _, r := range previewResults {
+				if !r.Skipped && r.Action == "delete" {
+					deletions++
+				}
+			}
+			if deletions > 0 {
+				color.Red("warning: this operation will delete %d file(s).", deletions)
+				fmt.Print("confirm deletion? [y/N]: ")
+				var response string
+				if _, err := fmt.Scanln(&response); err != nil {
+					return fmt.Errorf("operation cancelled")
+				}
+				response = strings.ToLower(strings.TrimSpace(response))
+				if response != "y" && response != "yes" {
+					return fmt.Errorf("operation cancelled")
+				}
+			}
+		}
+
+		results, err := organizer.Organize(folder, cfg, dryRun, recursive)
 		if err != nil {
 			return err
 		}
@@ -104,5 +134,7 @@ var runCmd = &cobra.Command{
 
 func init() {
 	runCmd.Flags().BoolVar(&dryRun, "dry-run", false, "preview without moving files")
+	runCmd.Flags().BoolVarP(&recursive, "recursive", "r", false, "organize subfolders recursively")
+	runCmd.Flags().BoolVarP(&yesFlag, "yes", "y", false, "bypass deletion confirmation prompt")
 	rootCmd.AddCommand(runCmd)
 }
