@@ -231,6 +231,19 @@ func handleDuplicate(src, dest, action string) (bool, string, error) {
 	return true, dest, nil
 }
 
+func executeFileAction(src, dest, action string) error {
+	if action == "copy" {
+		if err := copyFile(src, dest); err != nil {
+			return fmt.Errorf("copy file: %w", err)
+		}
+		return nil
+	}
+	if err := os.Rename(src, dest); err != nil {
+		return fmt.Errorf("move file: %w", err)
+	}
+	return nil
+}
+
 func processFile(src string, rule *config.Rule, conflictStrategy string, info os.FileInfo) (string, error) {
 	if rule.Action == "delete" {
 		if err := os.Remove(src); err != nil {
@@ -271,15 +284,8 @@ func processFile(src string, rule *config.Rule, conflictStrategy string, info os
 		return "", nil
 	}
 
-	switch rule.Action {
-	case "copy":
-		if err := copyFile(src, resolvedDest); err != nil {
-			return "", fmt.Errorf("copy file: %w", err)
-		}
-	default:
-		if err := os.Rename(src, resolvedDest); err != nil {
-			return "", fmt.Errorf("move file: %w", err)
-		}
+	if err := executeFileAction(src, resolvedDest, rule.Action); err != nil {
+		return "", err
 	}
 
 	return resolvedDest, nil

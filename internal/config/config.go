@@ -146,19 +146,7 @@ func DefaultConfigPath() string {
 	return ExpandHome("~/.tuckify/rules.toml")
 }
 
-func validateAndParseRule(r *Rule) error {
-	if r.Action == "" {
-		r.Action = "move"
-	}
-	act := r.Action
-	if act != "move" && act != "copy" && act != "delete" {
-		return fmt.Errorf("invalid action %q", act)
-	}
-	if (act == "move" || act == "copy") && r.Destination == "" {
-		return fmt.Errorf("destination is required for action %q", act)
-	}
-	r.Destination = ExpandHome(r.Destination)
-
+func parseRuleSizes(r *Rule) error {
 	if r.MinSize != "" {
 		sz, err := parseSizeString(r.MinSize)
 		if err != nil {
@@ -173,6 +161,10 @@ func validateAndParseRule(r *Rule) error {
 		}
 		r.maxSizeBytes = &sz
 	}
+	return nil
+}
+
+func parseRuleAges(r *Rule) error {
 	if r.MinAge != "" {
 		age, err := parseAgeString(r.MinAge)
 		if err != nil {
@@ -188,6 +180,25 @@ func validateAndParseRule(r *Rule) error {
 		r.maxAgeDuration = &age
 	}
 	return nil
+}
+
+func validateAndParseRule(r *Rule) error {
+	if r.Action == "" {
+		r.Action = "move"
+	}
+	act := r.Action
+	if act != "move" && act != "copy" && act != "delete" {
+		return fmt.Errorf("invalid action %q", act)
+	}
+	if (act == "move" || act == "copy") && r.Destination == "" {
+		return fmt.Errorf("destination is required for action %q", act)
+	}
+	r.Destination = ExpandHome(r.Destination)
+
+	if err := parseRuleSizes(r); err != nil {
+		return err
+	}
+	return parseRuleAges(r)
 }
 
 func Load(path string) (*Config, error) {

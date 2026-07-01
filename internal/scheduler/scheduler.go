@@ -28,35 +28,39 @@ func ResolveConfigPath(name, configPath string) string {
 	return config.DefaultConfigPath()
 }
 
+func printSingleResult(r organizer.Result, moved, copied, deleted *int) {
+	if r.Skipped {
+		fmt.Fprintf(os.Stderr, "skipped %s: %s\n", r.Source, r.SkipReason)
+		return
+	}
+
+	actionVerb := "moved"
+	switch r.Action {
+	case "copy":
+		actionVerb = "copied"
+	case "delete":
+		actionVerb = "deleted"
+	}
+
+	if r.Action == "delete" {
+		fmt.Printf("deleted %q\n", r.Source)
+		*deleted++
+	} else {
+		fmt.Printf("%s %q → %s\n", actionVerb, r.Source, r.Destination)
+		if r.Action == "copy" {
+			*copied++
+		} else {
+			*moved++
+		}
+	}
+}
+
 func printResults(results []organizer.Result) {
 	moved := 0
 	copied := 0
 	deleted := 0
 	for _, r := range results {
-		if r.Skipped {
-			fmt.Fprintf(os.Stderr, "skipped %s: %s\n", r.Source, r.SkipReason)
-			continue
-		}
-
-		actionVerb := "moved"
-		switch r.Action {
-		case "copy":
-			actionVerb = "copied"
-		case "delete":
-			actionVerb = "deleted"
-		}
-
-		if r.Action == "delete" {
-			fmt.Printf("deleted %q\n", r.Source)
-			deleted++
-		} else {
-			fmt.Printf("%s %q → %s\n", actionVerb, r.Source, r.Destination)
-			if r.Action == "copy" {
-				copied++
-			} else {
-				moved++
-			}
-		}
+		printSingleResult(r, &moved, &copied, &deleted)
 	}
 
 	summary := ""
