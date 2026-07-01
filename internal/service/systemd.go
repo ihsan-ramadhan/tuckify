@@ -109,14 +109,21 @@ func (s *SystemdService) removeOne(sysctl, name string) error {
 }
 
 func (s *SystemdService) Exists(name string) (bool, error) {
-	_, err := os.Stat(systemdServicePath(name))
-	if err == nil {
-		return true, nil
-	}
-	if os.IsNotExist(err) {
+	if _, err := os.Stat(systemdServicePath(name)); err != nil {
 		return false, nil
 	}
-	return false, err
+
+	sysctl, err := exec.LookPath(systemctlCmd)
+	if err != nil {
+		return true, nil
+	}
+
+	// systemctl is-active returns exit code 0 only if active
+	cmd := exec.Command(sysctl, systemdUserFlag, "is-active", systemdPrefix+name)
+	if err := cmd.Run(); err != nil {
+		return false, nil
+	}
+	return true, nil
 }
 
 func (s *SystemdService) CheckStatus() (string, error) {
