@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/ihsan-ramadhan/tuckify/internal/config"
 )
@@ -18,20 +19,53 @@ type Result struct {
 	Action      string
 }
 
-func MatchRule(filename string, rules []config.Rule) *config.Rule {
+func MatchRule(filename string, info os.FileInfo, rules []config.Rule) *config.Rule {
 	ext := strings.ToLower(filepath.Ext(filename))
 	lower := strings.ToLower(filename)
 	for i := range rules {
-		for _, e := range rules[i].Extensions {
-			if ext != "" && strings.ToLower(e) == ext {
-				return &rules[i]
+		if (rules[i].MinSizeBytes() != nil || rules[i].MaxSizeBytes() != nil ||
+			rules[i].MinAgeDuration() != nil || rules[i].MaxAgeDuration() != nil) && info == nil {
+			continue
+		}
+
+		if info != nil {
+			if minSz := rules[i].MinSizeBytes(); minSz != nil && info.Size() < *minSz {
+				continue
+			}
+			if maxSz := rules[i].MaxSizeBytes(); maxSz != nil && info.Size() > *maxSz {
+				continue
+			}
+			if minAge := rules[i].MinAgeDuration(); minAge != nil && time.Since(info.ModTime()) < *minAge {
+				continue
+			}
+			if maxAge := rules[i].MaxAgeDuration(); maxAge != nil && time.Since(info.ModTime()) > *maxAge {
+				continue
 			}
 		}
-		for _, pattern := range rules[i].FilenamePatterns {
-			if matched, _ := filepath.Match(strings.ToLower(pattern), lower); matched {
-				return &rules[i]
+
+		hasNameFilter := len(rules[i].Extensions) > 0 || len(rules[i].FilenamePatterns) > 0
+		nameMatched := false
+		if hasNameFilter {
+			for _, e := range rules[i].Extensions {
+				if ext != "" && strings.ToLower(e) == ext {
+					nameMatched = true
+					break
+				}
+			}
+			if !nameMatched {
+				for _, pattern := range rules[i].FilenamePatterns {
+					if m, _ := filepath.Match(strings.ToLower(pattern), lower); m {
+						nameMatched = true
+						break
+					}
+				}
+			}
+			if !nameMatched {
+				continue
 			}
 		}
+
+		return &rules[i]
 	}
 	return nil
 }
@@ -168,11 +202,6 @@ func Organize(folder string, cfg *config.Config, dryRun bool) ([]Result, error) 
 			continue
 		}
 		name := entry.Name()
-		rule := MatchRule(name, cfg.Rules)
-		if rule == nil {
-			continue
-		}
-
 		src := filepath.Join(folder, name)
 
 		info, err := entry.Info()
@@ -181,8 +210,12 @@ func Organize(folder string, cfg *config.Config, dryRun bool) ([]Result, error) 
 				Source:     src,
 				Skipped:    true,
 				SkipReason: fmt.Sprintf("cannot stat: %v", err),
-				Action:     rule.Action,
 			})
+			continue
+		}
+
+		rule := MatchRule(name, info, cfg.Rules)
+		if rule == nil {
 			continue
 		}
 

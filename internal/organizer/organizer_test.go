@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/ihsan-ramadhan/tuckify/internal/config"
 )
@@ -20,13 +21,13 @@ func TestMatchRule(t *testing.T) {
 		{Extensions: []string{".pdf"}, Destination: "/docs"},
 		{Extensions: []string{".jpg", ".PNG"}, Destination: "/pics"},
 	}
-	if r := MatchRule("file.PDF", rules); r == nil || r.Destination != "/docs" {
+	if r := MatchRule("file.PDF", nil, rules); r == nil || r.Destination != "/docs" {
 		t.Error("expected PDF rule match")
 	}
-	if r := MatchRule("file.png", rules); r == nil || r.Destination != "/pics" {
+	if r := MatchRule("file.png", nil, rules); r == nil || r.Destination != "/pics" {
 		t.Error("expected PNG rule match")
 	}
-	if MatchRule("noext", rules) != nil {
+	if MatchRule("noext", nil, rules) != nil {
 		t.Error("expected no match for file without extension")
 	}
 }
@@ -51,7 +52,7 @@ func TestMatchRuleFilenamePattern(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		r := MatchRule(c.file, rules)
+		r := MatchRule(c.file, nil, rules)
 		if c.wantNil && r != nil {
 			t.Errorf("%s: expected no match, got %s", c.file, r.Destination)
 		}
@@ -286,4 +287,95 @@ func TestOrganizeRenameAndDestinationTemplate(t *testing.T) {
 		t.Error("expected moved file to exist at templated destination")
 	}
 }
+
+func TestOrganizeSizeFilter(t *testing.T) {
+	dir := t.TempDir()
+	dest := filepath.Join(dir, "dest")
+
+	smallFile := filepath.Join(dir, "small.txt")
+	if err := os.WriteFile(smallFile, []byte("0123456789"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	largeFile := filepath.Join(dir, "large.txt")
+	if err := os.WriteFile(largeFile, make([]byte, 100), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	path := filepath.Join(t.TempDir(), "rules.toml")
+	content := `
+[[rule]]
+name        = "Large Files Only"
+extensions  = [".txt"]
+destination = "` + dest + `"
+min_size    = "50B"
+`
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfgParsed, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	results, err := Organize(dir, cfgParsed, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if filepath.Base(results[0].Source) != "large.txt" {
+		t.Errorf("expected large.txt to be organized, got %s", filepath.Base(results[0].Source))
+	}
+}
+
+func TestOrganizeAgeFilter(t *testing.T) {
+	dir := t.TempDir()
+	dest := filepath.Join(dir, "dest")
+
+	newFile := filepath.Join(dir, "new.txt")
+	if err := os.WriteFile(newFile, []byte("new"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	oldFile := filepath.Join(dir, "old.txt")
+	if err := os.WriteFile(oldFile, []byte("old"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	twoHoursAgo := time.Now().Add(-2 * time.Hour)
+	if err := os.Chtimes(oldFile, twoHoursAgo, twoHoursAgo); err != nil {
+		t.Fatal(err)
+	}
+
+	path := filepath.Join(t.TempDir(), "rules.toml")
+	content := `
+[[rule]]
+name        = "Old Files Only"
+extensions  = [".txt"]
+destination = "` + dest + `"
+min_age     = "1h"
+`
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfgParsed, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	results, err := Organize(dir, cfgParsed, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if filepath.Base(results[0].Source) != "old.txt" {
+		t.Errorf("expected old.txt to be organized, got %s", filepath.Base(results[0].Source))
+	}
+}
+
 
