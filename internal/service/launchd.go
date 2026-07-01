@@ -8,7 +8,11 @@ import (
 	"strings"
 )
 
-const launchctlCmd = "launchctl"
+const (
+	launchctlCmd    = "launchctl"
+	launchdBaseLabel = "com.ihsan.tuckify"
+	launchdPlistExt  = ".plist"
+)
 
 type LaunchdService struct{}
 
@@ -22,18 +26,14 @@ func launchdAgentsDir() string {
 }
 
 func launchdPlistPath(name string) string {
-	label := "com.ihsan.tuckify"
-	if name != "" {
-		label += "." + name
-	}
-	return filepath.Join(launchdAgentsDir(), label+".plist")
+	return filepath.Join(launchdAgentsDir(), launchdLabel(name)+launchdPlistExt)
 }
 
 func launchdLabel(name string) string {
 	if name == "" {
-		return "com.ihsan.tuckify"
+		return launchdBaseLabel
 	}
-	return "com.ihsan.tuckify." + name
+	return launchdBaseLabel + "." + name
 }
 
 func (l *LaunchdService) Install(name, folder, cronExpr, configPath string) error {
@@ -81,10 +81,10 @@ func (l *LaunchdService) Uninstall(name string) error {
 	}
 	for _, e := range entries {
 		n := e.Name()
-		if strings.HasPrefix(n, "com.ihsan.tuckify") && strings.HasSuffix(n, ".plist") {
-			label := strings.TrimSuffix(n, ".plist")
-			scheduleName := strings.TrimPrefix(label, "com.ihsan.tuckify.")
-			if scheduleName == "com.ihsan.tuckify" {
+		if strings.HasPrefix(n, launchdBaseLabel) && strings.HasSuffix(n, launchdPlistExt) {
+			label := strings.TrimSuffix(n, launchdPlistExt)
+			scheduleName := strings.TrimPrefix(label, launchdBaseLabel+".")
+			if scheduleName == launchdBaseLabel {
 				scheduleName = ""
 			}
 			_ = l.removeOne(lctl, scheduleName)

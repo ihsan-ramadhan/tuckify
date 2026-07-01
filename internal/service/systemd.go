@@ -9,8 +9,11 @@ import (
 )
 
 const (
-	systemctlCmd    = "systemctl"
-	systemdUserFlag = "--user"
+	systemctlCmd      = "systemctl"
+	systemdUserFlag   = "--user"
+	systemdPrefix     = "tuckify-"
+	systemdSuffix     = ".service"
+	systemdDaemonLoad = "daemon-reload"
 )
 
 type SystemdService struct{}
@@ -21,7 +24,7 @@ func NewSystemdService() *SystemdService {
 
 func systemdServicePath(name string) string {
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".config", "systemd", "user", "tuckify-"+name+".service")
+	return filepath.Join(home, ".config", "systemd", "user", systemdPrefix+name+systemdSuffix)
 }
 
 func systemdServiceDir() string {
@@ -50,11 +53,11 @@ func (s *SystemdService) Install(name, folder, cronExpr, configPath string) erro
 		return fmt.Errorf("find systemctl: %w", err)
 	}
 
-	if err := exec.Command(sysctl, systemdUserFlag, "daemon-reload").Run(); err != nil {
+	if err := exec.Command(sysctl, systemdUserFlag, systemdDaemonLoad).Run(); err != nil {
 		return fmt.Errorf("systemd daemon-reload: %w", err)
 	}
 
-	unitName := "tuckify-" + name
+	unitName := systemdPrefix + name
 	if err := exec.Command(sysctl, systemdUserFlag, "enable", "--now", unitName).Run(); err != nil {
 		return fmt.Errorf("enable and start %s service: %w", unitName, err)
 	}
@@ -72,7 +75,6 @@ func (s *SystemdService) Uninstall(name string) error {
 		return s.removeOne(sysctl, name)
 	}
 
-	// remove all tuckify-*.service
 	dir := systemdServiceDir()
 	entries, err := os.ReadDir(dir)
 	if err != nil && !os.IsNotExist(err) {
@@ -80,19 +82,19 @@ func (s *SystemdService) Uninstall(name string) error {
 	}
 	for _, e := range entries {
 		n := e.Name()
-		if strings.HasPrefix(n, "tuckify-") && strings.HasSuffix(n, ".service") {
-			unitName := strings.TrimSuffix(n, ".service")
-			_ = s.removeOne(sysctl, strings.TrimPrefix(unitName, "tuckify-"))
+		if strings.HasPrefix(n, systemdPrefix) && strings.HasSuffix(n, systemdSuffix) {
+			unitName := strings.TrimSuffix(n, systemdSuffix)
+			_ = s.removeOne(sysctl, strings.TrimPrefix(unitName, systemdPrefix))
 		}
 	}
 
-	_ = exec.Command(sysctl, systemdUserFlag, "daemon-reload").Run()
+	_ = exec.Command(sysctl, systemdUserFlag, systemdDaemonLoad).Run()
 	return nil
 }
 
 func (s *SystemdService) removeOne(sysctl, name string) error {
 	servicePath := systemdServicePath(name)
-	unitName := "tuckify-" + name
+	unitName := systemdPrefix + name
 
 	if _, err := os.Stat(servicePath); err == nil {
 		_ = exec.Command(sysctl, systemdUserFlag, "disable", "--now", unitName).Run()
@@ -102,7 +104,7 @@ func (s *SystemdService) removeOne(sysctl, name string) error {
 		return fmt.Errorf("remove service file: %w", err)
 	}
 
-	_ = exec.Command(sysctl, systemdUserFlag, "daemon-reload").Run()
+	_ = exec.Command(sysctl, systemdUserFlag, systemdDaemonLoad).Run()
 	return nil
 }
 
@@ -122,7 +124,7 @@ func (s *SystemdService) CheckStatus() (string, error) {
 }
 
 func (s *SystemdService) Logs(name string, follow bool, lines int) error {
-	args := []string{"--user", "-u", "tuckify-" + name, "-n", fmt.Sprintf("%d", lines), "-o", "short-monotonic"}
+	args := []string{"--user", "-u", systemdPrefix + name, "-n", fmt.Sprintf("%d", lines), "-o", "short-monotonic"}
 	if follow {
 		args = append(args, "-f")
 	}
@@ -132,7 +134,7 @@ func (s *SystemdService) Logs(name string, follow bool, lines int) error {
 		return fmt.Errorf("journalctl not found: %w", err)
 	}
 
-	fmt.Printf("\033[1;34m==> logs: tuckify-%s\033[0m\n", name)
+	fmt.Printf("\033[1;34m==> logs: %s%s\033[0m\n", systemdPrefix, name)
 	cmd := exec.Command(jctl, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

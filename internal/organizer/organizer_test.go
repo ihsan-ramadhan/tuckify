@@ -26,7 +26,7 @@ func TestMatchRule(t *testing.T) {
 	if r := MatchRule("file.png", rules); r == nil || r.Destination != "/pics" {
 		t.Error("expected PNG rule match")
 	}
-	if r := MatchRule("noext", rules); r != nil {
+	if MatchRule("noext", rules) != nil {
 		t.Error("expected no match for file without extension")
 	}
 }
