@@ -84,6 +84,7 @@ tuckify list
 tuckify run <folder> [--dry-run] [--config <path>]
 tuckify schedule <name> <folder> --cron "<expr>" [--run] [--config <path>]
 tuckify list
+tuckify edit <name> [--cron <expr>] [--folder <folder>] [--config <path>]
 tuckify start <name>
 tuckify stop <name>
 tuckify restart <name>
@@ -101,6 +102,7 @@ tuckify uninstall
 | `run` | Organize files once |
 | `schedule` | Save a named schedule (`--run` to also start interactively) |
 | `list` | Show all saved schedules and their status |
+| `edit` | Update an existing schedule's cron, folder, or config |
 | `start` | Activate a saved schedule as a background service |
 | `stop` | Deactivate a service (keeps it in the list) |
 | `restart` | Stop then start a service (picks up config changes) |

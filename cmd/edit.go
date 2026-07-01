@@ -40,6 +40,9 @@ var editCmd = &cobra.Command{
 
 		if cmd.Flags().Changed("folder") {
 			newFolder, _ := cmd.Flags().GetString("folder")
+			if newFolder == "" {
+				return fmt.Errorf("folder path cannot be empty")
+			}
 			abs, err := filepath.Abs(newFolder)
 			if err != nil {
 				return fmt.Errorf("resolve folder path: %w", err)
