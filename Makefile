@@ -16,7 +16,8 @@ lint:
 	golangci-lint run ./...
 
 install-hooks:
-	lefthook install
+	cp scripts/pre-commit .git/hooks/pre-commit
+	chmod +x .git/hooks/pre-commit
 
 release: clean
 	mkdir -p dist
