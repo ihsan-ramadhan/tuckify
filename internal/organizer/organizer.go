@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -117,11 +118,7 @@ func copyFile(src, dest string) (err error) {
 	if err != nil {
 		return err
 	}
-	defer func() {
-		if closeErr := out.Close(); err == nil {
-			err = closeErr
-		}
-	}()
+	defer func() { _ = out.Close() }()
 
 	if _, err := io.Copy(out, in); err != nil {
 		return err
@@ -328,16 +325,6 @@ func listFiles(folder string, recursive bool) ([]string, error) {
 	return files, err
 }
 
-func sortDirs(dirs []string) {
-	for i := 0; i < len(dirs); i++ {
-		for j := i + 1; j < len(dirs); j++ {
-			if len(dirs[i]) < len(dirs[j]) {
-				dirs[i], dirs[j] = dirs[j], dirs[i]
-			}
-		}
-	}
-}
-
 func deleteEmptyDirs(root string) error {
 	var dirs []string
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
@@ -353,7 +340,9 @@ func deleteEmptyDirs(root string) error {
 		return err
 	}
 
-	sortDirs(dirs)
+	sort.Slice(dirs, func(i, j int) bool {
+		return len(dirs[i]) > len(dirs[j])
+	})
 
 	for _, dir := range dirs {
 		entries, err := os.ReadDir(dir)
