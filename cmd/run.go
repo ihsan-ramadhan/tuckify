@@ -7,6 +7,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/ihsan-ramadhan/tuckify/internal/config"
+	"github.com/ihsan-ramadhan/tuckify/internal/history"
 	"github.com/ihsan-ramadhan/tuckify/internal/organizer"
 	"github.com/spf13/cobra"
 )
@@ -62,6 +63,23 @@ var runCmd = &cobra.Command{
 		results, err := organizer.Organize(folder, cfg, dryRun, recursive)
 		if err != nil {
 			return err
+		}
+
+		// save history for undo (only on real run)
+		if !dryRun {
+			var histEntries []history.Entry
+			for _, r := range results {
+				if !r.Skipped && (r.Action == "" || r.Action == "move") {
+					histEntries = append(histEntries, history.Entry{
+						Src:    r.Source,
+						Dest:   r.Destination,
+						Action: "move",
+					})
+				}
+			}
+			if len(histEntries) > 0 {
+				_ = history.Save(histEntries)
+			}
 		}
 
 		moved := 0

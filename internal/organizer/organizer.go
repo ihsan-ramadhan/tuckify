@@ -450,3 +450,7 @@ func Organize(folder string, cfg *config.Config, dryRun bool, recursive bool) ([
 
 	return results, nil
 }
+
+// HistoryWriter is set by cmd layer to persist undo history.
+// ponytail: func var so callers (cmd/run.go) can inject without import cycle.
+var HistoryWriter func(results []Result) error
