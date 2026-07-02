@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/fatih/color"
+	"github.com/ihsan-ramadhan/tuckify/internal/ansi"
 	"github.com/ihsan-ramadhan/tuckify/internal/config"
 	"github.com/ihsan-ramadhan/tuckify/internal/history"
 	"github.com/ihsan-ramadhan/tuckify/internal/organizer"
@@ -47,7 +47,7 @@ var runCmd = &cobra.Command{
 				}
 			}
 			if deletions > 0 {
-				color.Red("warning: this operation will delete %d file(s).", deletions)
+				ansi.PrintRed("warning: this operation will delete %d file(s).\n", deletions)
 				fmt.Print("confirm deletion? [y/N]: ")
 				var response string
 				if _, err := fmt.Scanln(&response); err != nil {
@@ -87,7 +87,7 @@ var runCmd = &cobra.Command{
 		deleted := 0
 		for _, r := range results {
 			if r.Skipped {
-				color.Yellow("skipped %s: %s", r.Source, r.SkipReason)
+				ansi.PrintYellow("skipped %s: %s\n", r.Source, r.SkipReason)
 				continue
 			}
 
