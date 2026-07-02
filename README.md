@@ -57,8 +57,10 @@ Invoke-WebRequest -Uri "https://raw.githubusercontent.com/ihsan-ramadhan/tuckify
 **2. Run once:**
 
 ```bash
-tuckify run ~/Downloads
-tuckify run ~/Downloads --dry-run   # preview without moving
+tuckify run [folders...]
+tuckify run ~/Downloads ~/Desktop
+tuckify run                             # runs on all locations defined in rules
+tuckify run ~/Downloads --dry-run        # preview without moving
 ```
 
 ---
@@ -69,7 +71,8 @@ tuckify run ~/Downloads --dry-run   # preview without moving
 
 | Command | Description |
 |---|---|
-| `run` | Organize files once |
+| `run [folders...]` | Organize files in one or more folders. If no folders are specified, it automatically processes all unique directories defined in rule `locations`. |
+| `undo` | Undo the last `tuckify run` (restores moved files) |
 | `schedule` | Save a named schedule (`--run` to also start interactively) |
 | `list` | Show all saved schedules and their status |
 | `edit` | Update an existing schedule's cron, folder, or config |
@@ -133,6 +136,7 @@ A rule can use one or more matchers (all are **case-insensitive**):
 | `extensions` | `[".pdf", ".docx"]` | File extensions |
 | `filename_patterns` | `["*Modul*", "Invoice_*"]` | Glob patterns (`*` matches any characters) |
 | `filename_regex` | `["^invoice_\\d{4}\\.pdf$"]` | Go regular expressions |
+| `locations` | `["~/Downloads", "~/Desktop/Inbox"]` | List of folders this rule applies to. If omitted, applies anywhere. |
 
 ### Rule Actions
 * `action = "move"` (default): Moves the file to `destination`.
@@ -145,6 +149,7 @@ A rule can use one or more matchers (all are **case-insensitive**):
   * `"skip"`: Leaves the file in source, does not move.
   * `"overwrite"`: Overwrites the destination file.
   * `"delete_duplicate"`: Deletes source if SHA-256 matches destination, otherwise falls back to `"rename"`.
+  * `"ask"`: Prompts interactively: `[O]verwrite`, `[S]kip`, `[R]ename`.
 
 ### Size and Age Filters
 * Size: `min_size` / `max_size` (e.g. `"50B"`, `"10KB"`, `"100MB"`, `"1GB"`)

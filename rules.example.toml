@@ -13,6 +13,7 @@
 #   extensions = [".pdf"]             → match by extension
 #   filename_patterns = ["*Modul*"]   → match file containing "Modul"
 #   filename_regex = ["^inv_\\d+$"]    → match file starting with inv_ followed by numbers (without extension)
+#   locations = ["~/Downloads"]        → only apply rule to files inside ~/Downloads
 #
 # Template Tokens (for destination and rename paths):
 #   {year}, {month}, {day}, {hour}, {minute}, {second}  → file modification time
@@ -29,6 +30,7 @@
 # "skip"             → leave the file, do not move
 # "overwrite"        → replace the existing file
 # "delete_duplicate" → delete source if content hash matches destination, fallback to rename if different
+# "ask"              → prompt interactively: [O]verwrite, [S]kip, [R]ename
 conflict_strategy = "rename"
 
 # --- Documents ---
@@ -36,6 +38,7 @@ conflict_strategy = "rename"
 [[rule]]
 name        = "PDF"
 extensions  = [".pdf"]
+locations   = ["~/Downloads"]
 destination = "~/Documents/PDF"
 
 [[rule]]
@@ -53,6 +56,7 @@ destination = "~/Documents/Text"
 [[rule]]
 name        = "Photos"
 extensions  = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic"]
+locations   = ["~/Downloads", "~/Desktop"]
 destination = "~/Pictures/Sorted"
 
 [[rule]]

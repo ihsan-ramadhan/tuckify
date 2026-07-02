@@ -28,6 +28,7 @@ type Rule struct {
 	Extensions       []string `toml:"extensions"`
 	FilenamePatterns []string `toml:"filename_patterns"`
 	FilenameRegex    []string `toml:"filename_regex"`
+	Locations        []string `toml:"locations"`
 	Destination      string   `toml:"destination"`
 	Action           string   `toml:"action"`
 	Rename           string   `toml:"rename"`
@@ -41,6 +42,7 @@ type Rule struct {
 	minAgeDuration      *time.Duration
 	maxAgeDuration      *time.Duration
 	filenameRegexCompiled []*regexp.Regexp
+	locationsExpanded    []string
 }
 
 func (r *Rule) MinSizeBytes() *int64 {
@@ -61,6 +63,17 @@ func (r *Rule) MaxAgeDuration() *time.Duration {
 
 func (r *Rule) FilenameRegexCompiled() []*regexp.Regexp {
 	return r.filenameRegexCompiled
+}
+
+func (r *Rule) LocationsExpanded() []string {
+	if len(r.locationsExpanded) == 0 && len(r.Locations) > 0 {
+		var res []string
+		for _, loc := range r.Locations {
+			res = append(res, ExpandHome(loc))
+		}
+		return res
+	}
+	return r.locationsExpanded
 }
 
 func parseSizeString(s string) (int64, error) {
@@ -213,6 +226,10 @@ func validateAndParseRule(r *Rule) error {
 		return fmt.Errorf("destination is required for action %q", act)
 	}
 	r.Destination = ExpandHome(r.Destination)
+
+	for _, loc := range r.Locations {
+		r.locationsExpanded = append(r.locationsExpanded, ExpandHome(loc))
+	}
 
 	if err := parseRuleSizes(r); err != nil {
 		return err

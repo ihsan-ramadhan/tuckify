@@ -1,6 +1,7 @@
 package organizer
 
 import (
+	"bufio"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -70,9 +71,21 @@ func matchName(rule *config.Rule, filename string) bool {
 	}
 	return false
 }
-
-func MatchRule(filename string, info os.FileInfo, rules []config.Rule) *config.Rule {
+func MatchRule(filename string, info os.FileInfo, rules []config.Rule, folder string) *config.Rule {
 	for i := range rules {
+		// Check if this rule applies to the current folder
+		if len(rules[i].LocationsExpanded()) > 0 {
+			matchesFolder := false
+			for _, loc := range rules[i].LocationsExpanded() {
+				if strings.HasPrefix(folder, loc) {
+					matchesFolder = true
+					break
+				}
+			}
+			if !matchesFolder {
+				continue
+			}
+		}
 		if matchMetadata(&rules[i], info) && matchName(&rules[i], filename) {
 			return &rules[i]
 		}
@@ -80,24 +93,61 @@ func MatchRule(filename string, info os.FileInfo, rules []config.Rule) *config.R
 	return nil
 }
 
-func resolveDest(destDir, filename, strategy string) (string, error) {
-	dest := filepath.Join(destDir, filename)
+func askConflictStrategy(src, dest string) (string, error) {
+	reader := bufio.NewReader(os.Stdin)
+	for {
+		fmt.Printf("Conflict: %q already exists at %q\n", filepath.Base(src), dest)
+		fmt.Print("Choose: [O]verwrite, [S]kip, [R]ename: ")
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			return "", fmt.Errorf("read input: %w", err)
+		}
+		input = strings.TrimSpace(strings.ToLower(input))
+		switch input {
+		case "o", "overwrite":
+			return "overwrite", nil
+		case "s", "skip":
+			return "skip", nil
+		case "r", "rename":
+			return "rename", nil
+		default:
+			fmt.Println("Invalid choice. Please enter O, S, or R.")
+		}
+	}
+}
+
+func resolveDest(destDir, targetName, conflictStrategy string) (string, error) {
+	dest := filepath.Join(destDir, targetName)
 	if _, err := os.Stat(dest); os.IsNotExist(err) {
 		return dest, nil
 	}
-	switch strategy {
+
+	switch conflictStrategy {
 	case "skip":
 		return "", nil
 	case "overwrite":
 		return dest, nil
-	default:
-		ext := filepath.Ext(filename)
-		base := strings.TrimSuffix(filename, ext)
-		for i := 1; ; i++ {
-			candidate := filepath.Join(destDir, fmt.Sprintf("%s_%d%s", base, i, ext))
-			if _, err := os.Stat(candidate); os.IsNotExist(err) {
-				return candidate, nil
-			}
+	case "ask":
+		choice, err := askConflictStrategy(dest, dest)
+		if err != nil {
+			return "", err
+		}
+		if choice == "skip" {
+			return "", nil
+		}
+		if choice == "overwrite" {
+			return dest, nil
+		}
+	}
+
+	// rename strategy (default)
+	ext := filepath.Ext(targetName)
+	base := strings.TrimSuffix(targetName, ext)
+	for i := 1; ; i++ {
+		newName := fmt.Sprintf("%s_%d%s", base, i, ext)
+		newDest := filepath.Join(destDir, newName)
+		if _, err := os.Stat(newDest); os.IsNotExist(err) {
+			return newDest, nil
 		}
 	}
 }
@@ -367,7 +417,8 @@ func organizeFile(src string, cfg *config.Config, dryRun bool) (Result, bool) {
 		}, true
 	}
 
-	rule := MatchRule(name, info, cfg.Rules)
+	folder := filepath.Dir(src)
+	rule := MatchRule(name, info, cfg.Rules, folder)
 	if rule == nil {
 		return Result{}, false
 	}
