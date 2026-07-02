@@ -414,6 +414,59 @@ func TestOrganizeRecursive(t *testing.T) {
 	}
 }
 
+func TestMatchRuleFilenameRegex(t *testing.T) {
+	dir := t.TempDir()
+	dest := filepath.Join(dir, "matched")
+	_ = os.MkdirAll(dest, 0o755)
+
+	for _, f := range []string{"invoice_2024.pdf", "report_final.txt"} {
+		_ = os.WriteFile(filepath.Join(dir, f), []byte("data"), 0o644)
+	}
+
+	content := `
+[[rule]]
+name           = "Invoice regex"
+filename_regex = ["^invoice_\\d{4}\\.pdf$"]
+destination    = '` + dest + `'
+action         = "move"
+`
+	results := runTestOrganize(t, dir, content)
+	if filepath.Base(results[0].Source) != "invoice_2024.pdf" {
+		t.Errorf("expected invoice_2024.pdf, got %s", filepath.Base(results[0].Source))
+	}
+}
+
+func TestMatchRuleFilenameRegexNoMatch(t *testing.T) {
+	dir := t.TempDir()
+	dest := filepath.Join(dir, "matched")
+	_ = os.MkdirAll(dest, 0o755)
+
+	_ = os.WriteFile(filepath.Join(dir, "report_final.txt"), []byte("data"), 0o644)
+
+	content := `
+[[rule]]
+name           = "Invoice regex"
+filename_regex = ["^invoice_\\d{4}\\.pdf$"]
+destination    = '` + dest + `'
+action         = "move"
+`
+	path := filepath.Join(t.TempDir(), "rules.toml")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfgParsed, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	results, err := Organize(dir, cfgParsed, false, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 0 {
+		t.Errorf("expected 0 results for non-matching regex, got %d", len(results))
+	}
+}
+
 func TestDeleteEmptyDirs(t *testing.T) {
 	dir := t.TempDir()
 	nested := filepath.Join(dir, "a", "b", "c")

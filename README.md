@@ -54,46 +54,16 @@ New-Item -ItemType Directory -Path "$HOME\.tuckify" -Force
 Invoke-WebRequest -Uri "https://raw.githubusercontent.com/ihsan-ramadhan/tuckify/main/rules.example.toml" -OutFile "$HOME\.tuckify\rules.toml"
 ```
 
-**2. Run:**
+**2. Run once:**
 
 ```bash
-# organize once
 tuckify run ~/Downloads
-
-# preview without moving files
-tuckify run ~/Downloads --dry-run
-
-# save a schedule
-tuckify schedule downloads ~/Downloads --cron "0 9 * * *"
-
-# activate as a background service
-tuckify start downloads
-
-# or save + test interactively in one command
-tuckify schedule downloads ~/Downloads --cron "0 9 * * *" --run
-
-# check status
-tuckify list
+tuckify run ~/Downloads --dry-run   # preview without moving
 ```
 
 ---
 
 ## Usage
-
-```
-tuckify run <folder> [--dry-run] [--config <path>] [-r|--recursive] [-y|--yes]
-tuckify schedule <name> <folder> --cron "<expr>" [--run] [--config <path>] [-r|--recursive]
-tuckify list
-tuckify edit <name> [--cron <expr>] [--folder <folder>] [--config <path>] [-r|--recursive <bool>]
-tuckify start <name>
-tuckify stop <name>
-tuckify restart <name>
-tuckify logs <name> [-f] [-n <lines>]
-tuckify delete <name>
-tuckify startup
-tuckify unstartup
-tuckify uninstall
-```
 
 ### Commands
 
@@ -112,27 +82,22 @@ tuckify uninstall
 | `unstartup` | Remove all tuckify system services |
 | `uninstall` | Remove binary, services, and optionally config |
 
-### Workflow
+### Schedule lifecycle
 
-```
-# 1. save a schedule
+```bash
+# save a schedule
 tuckify schedule downloads ~/Downloads --cron "0 9 * * *"
-# saved schedule "downloads"
-#   run 'tuckify start downloads' to activate as a background service
 
-# 2. activate it as a background service
+# activate as a background service
 tuckify start downloads
 
-# 3. check status
+# check status
 tuckify list
-#  NAME               │ STATUS   │ SAVED  │ CRON           │ FOLDER
-# ────────────────────┼──────────┼────────┼────────────────┼──────────────────────
-#  downloads          │ online   │ yes    │ 0 9 * * *      │ /home/user/Downloads
 
-# 4. survive reboots
+# install all saved schedules as system services (survives reboot)
 tuckify startup
 
-# 5. remove
+# remove
 tuckify delete downloads
 ```
 
@@ -160,55 +125,47 @@ Examples:
 
 Default path: `~/.tuckify/rules.toml`
 
-```toml
-[settings]
-# conflict strategy options: "rename" | "skip" | "overwrite" | "delete_duplicate"
-conflict_strategy = "rename"
+### Rule Matchers
+A rule can use one or more matchers (all are **case-insensitive**):
 
-[[rule]]
-name        = "by extension (default move)"
-extensions  = [".pdf", ".docx"]
-destination = "~/Documents"
+| Matcher | Example | Matches |
+|---|---|---|
+| `extensions` | `[".pdf", ".docx"]` | File extensions |
+| `filename_patterns` | `["*Modul*", "Invoice_*"]` | Glob patterns (`*` matches any characters) |
+| `filename_regex` | `["^invoice_\\d{4}\\.pdf$"]` | Go regular expressions |
 
-[[rule]]
-name              = "by filename and copy"
-filename_patterns = ["*modul*", "invoice_*"]
-destination       = "~/Documents/Sorted"
-action            = "copy"
+### Rule Actions
+* `action = "move"` (default): Moves the file to `destination`.
+* `action = "copy"`: Copies the file to `destination`.
+* `action = "delete"`: Deletes the file (no `destination` required).
 
-[[rule]]
-name        = "by age and size filters with renaming and modifiers"
-extensions  = [".log", ".tmp"]
-destination = "~/Archives/{year}/{month}"
-rename      = "{base:slug}_old{ext}"
-min_age     = "30d"
-max_size    = "100MB"
+### Rule Settings
+* `conflict_strategy`: How to handle files that already exist at the destination.
+  * `"rename"` (default): Appends suffix `_1`, `_2`, etc.
+  * `"skip"`: Leaves the file in source, does not move.
+  * `"overwrite"`: Overwrites the destination file.
+  * `"delete_duplicate"`: Deletes source if SHA-256 matches destination, otherwise falls back to `"rename"`.
 
-[[rule]]
-name        = "delete large installers"
-extensions  = [".exe", ".dmg"]
-action      = "delete"
-min_size    = "500MB"
-```
+### Size and Age Filters
+* Size: `min_size` / `max_size` (e.g. `"50B"`, `"10KB"`, `"100MB"`, `"1GB"`)
+* Age: `min_age` / `max_age` (e.g. `"30d"`, `"1h"`, `"2w"`, `"1y"`)
 
-A rule can have `extensions`, `filename_patterns`, or both — a file matches if either condition is met. Additional boundaries like size and age can be added using size/age filters.
+### Template Tokens
+Can be used in `destination` and `rename` paths:
+* `{year}`, `{month}`, `{day}`, `{hour}`, `{minute}`, `{second}` (e.g. `~/Archive/{year}`)
+* `{base}`: The original filename without extension.
+* `{ext}`: The original extension.
+* Modifiers (e.g. `{base:slug}`, `{base:lower}`, `{base:upper}`).
 
-Filename patterns use glob syntax (`*` matches any characters, case-insensitive):
-- `"*Modul*"` — any file containing "Modul"
-- `"Invoice_*"` — any file starting with "Invoice_"
-- `"*_2024.*"` — any file with "_2024" before the extension
+See [`rules.example.toml`](rules.example.toml) for complete examples.
 
 ### Behavior
 
-- Rules run **top to bottom**, file matches **first rule only**
-- Extension matching is **case-insensitive** (`.PDF` == `.pdf`)
-- Filename pattern matching is **case-insensitive**
-- Files without an extension can match via `filename_patterns`
-- Missing destination folders are created automatically
-- Default conflict strategy `rename`: appends `_1`, `_2`, etc.
-- If `delete_duplicate` conflict strategy is chosen, files are checked using their SHA-256 hash. If they are duplicates, the source file is deleted (for moves) or skipped (for copies).
-- When `--recursive` / `-r` is used, empty directories left in the source directory are automatically deleted.
-- Deletion rules require interactive confirmation during manual runs, which can be bypassed using the `--yes` / `-y` flag.
+- Rules execute **top to bottom**; a file matches the **first matching rule only**.
+- Files without extensions can be matched via `filename_patterns` or `filename_regex`.
+- Missing destination folders are created automatically.
+- When `--recursive` / `-r` is used, empty source subdirectories are automatically cleaned up.
+- Deletion rules require interactive confirmation during manual runs, bypassable via `--yes` / `-y`.
 
 ---
 

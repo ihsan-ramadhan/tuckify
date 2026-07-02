@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -26,6 +27,7 @@ type Rule struct {
 	Name             string   `toml:"name"`
 	Extensions       []string `toml:"extensions"`
 	FilenamePatterns []string `toml:"filename_patterns"`
+	FilenameRegex    []string `toml:"filename_regex"`
 	Destination      string   `toml:"destination"`
 	Action           string   `toml:"action"`
 	Rename           string   `toml:"rename"`
@@ -34,10 +36,11 @@ type Rule struct {
 	MinAge           string   `toml:"min_age"`
 	MaxAge           string   `toml:"max_age"`
 
-	minSizeBytes   *int64
-	maxSizeBytes   *int64
-	minAgeDuration *time.Duration
-	maxAgeDuration *time.Duration
+	minSizeBytes        *int64
+	maxSizeBytes        *int64
+	minAgeDuration      *time.Duration
+	maxAgeDuration      *time.Duration
+	filenameRegexCompiled []*regexp.Regexp
 }
 
 func (r *Rule) MinSizeBytes() *int64 {
@@ -54,6 +57,10 @@ func (r *Rule) MinAgeDuration() *time.Duration {
 
 func (r *Rule) MaxAgeDuration() *time.Duration {
 	return r.maxAgeDuration
+}
+
+func (r *Rule) FilenameRegexCompiled() []*regexp.Regexp {
+	return r.filenameRegexCompiled
 }
 
 func parseSizeString(s string) (int64, error) {
@@ -182,6 +189,18 @@ func parseRuleAges(r *Rule) error {
 	return nil
 }
 
+func compileRuleRegexes(r *Rule) error {
+	for _, p := range r.FilenameRegex {
+		// prepend (?i) for case-insensitive, consistent with extensions & filename_patterns
+		re, err := regexp.Compile("(?i)" + p)
+		if err != nil {
+			return fmt.Errorf("invalid filename_regex %q: %w", p, err)
+		}
+		r.filenameRegexCompiled = append(r.filenameRegexCompiled, re)
+	}
+	return nil
+}
+
 func validateAndParseRule(r *Rule) error {
 	if r.Action == "" {
 		r.Action = "move"
@@ -198,7 +217,10 @@ func validateAndParseRule(r *Rule) error {
 	if err := parseRuleSizes(r); err != nil {
 		return err
 	}
-	return parseRuleAges(r)
+	if err := parseRuleAges(r); err != nil {
+		return err
+	}
+	return compileRuleRegexes(r)
 }
 
 func Load(path string) (*Config, error) {

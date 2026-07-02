@@ -47,7 +47,7 @@ func matchMetadata(rule *config.Rule, info os.FileInfo) bool {
 }
 
 func matchName(rule *config.Rule, filename string) bool {
-	if len(rule.Extensions) == 0 && len(rule.FilenamePatterns) == 0 {
+	if len(rule.Extensions) == 0 && len(rule.FilenamePatterns) == 0 && len(rule.FilenameRegex) == 0 {
 		return true
 	}
 	ext := strings.ToLower(filepath.Ext(filename))
@@ -59,6 +59,11 @@ func matchName(rule *config.Rule, filename string) bool {
 	}
 	for _, pattern := range rule.FilenamePatterns {
 		if m, _ := filepath.Match(strings.ToLower(pattern), lower); m {
+			return true
+		}
+	}
+	for _, re := range rule.FilenameRegexCompiled() {
+		if re.MatchString(filename) {
 			return true
 		}
 	}
