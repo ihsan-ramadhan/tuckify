@@ -481,11 +481,11 @@ func TestMatchRuleLocations(t *testing.T) {
 		t.Error("expected JPG rule match for Desktop")
 	}
 	// Rule 1 should NOT match for Desktop folder
-	if r := MatchRule("file.pdf", nil, rules, "/home/user/Desktop"); r != nil {
+	if MatchRule("file.pdf", nil, rules, "/home/user/Desktop") != nil {
 		t.Error("expected no match for PDF in Desktop folder")
 	}
 	// Rule 2 should NOT match for Downloads folder
-	if r := MatchRule("file.jpg", nil, rules, "/home/user/Downloads"); r != nil {
+	if MatchRule("file.jpg", nil, rules, "/home/user/Downloads") != nil {
 		t.Error("expected no match for JPG in Downloads folder")
 	}
 	// Rule without locations should match anywhere

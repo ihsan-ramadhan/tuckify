@@ -54,6 +54,67 @@ func runTick(name string, folders []string, configPath string) ([]organizer.Resu
 	return allResults, nil
 }
 
+// resultActionVerb maps a Result.Action to its past-tense display verb.
+func resultActionVerb(action string) string {
+	switch action {
+	case "copy":
+		return "copied"
+	case "delete":
+		return "deleted"
+	default:
+		return "moved"
+	}
+}
+
+// printTickResults prints one line per non-skipped/skipped result.
+// ponytail: extracted from Run's closure to reduce cognitive complexity (SonarQube go:S3776).
+func printTickResults(results []organizer.Result) {
+	for _, r := range results {
+		if r.Skipped {
+			fmt.Fprintf(os.Stderr, "skipped %s: %s\n", r.Source, r.SkipReason)
+			continue
+		}
+		if r.Action == "delete" {
+			fmt.Printf("deleted %q\n", r.Source)
+			continue
+		}
+		fmt.Printf("%s %q → %s\n", resultActionVerb(r.Action), r.Source, r.Destination)
+	}
+}
+
+// summarizeTickResults builds the "N file(s) moved, M file(s) copied, ..." summary line.
+func summarizeTickResults(results []organizer.Result) string {
+	moved, copied, deleted := 0, 0, 0
+	for _, r := range results {
+		if r.Skipped {
+			continue
+		}
+		switch r.Action {
+		case "copy":
+			copied++
+		case "delete":
+			deleted++
+		default:
+			moved++
+		}
+	}
+
+	var parts []string
+	if moved > 0 {
+		parts = append(parts, fmt.Sprintf("%d file(s) moved", moved))
+	}
+	if copied > 0 {
+		parts = append(parts, fmt.Sprintf("%d file(s) copied", copied))
+	}
+	if deleted > 0 {
+		parts = append(parts, fmt.Sprintf("%d file(s) deleted", deleted))
+	}
+	if len(parts) == 0 {
+		return "0 file(s) processed"
+	}
+	return strings.Join(parts, ", ")
+}
+
 func Run(name string, folders []string, expr, configPath string) error {
 	c := cron.New()
 
@@ -64,57 +125,8 @@ func Run(name string, folders []string, expr, configPath string) error {
 			return
 		}
 		// ponytail: print moved to cmd layer (avoid duplication)
-		for _, r := range results {
-			if r.Skipped {
-				fmt.Fprintf(os.Stderr, "skipped %s: %s\n", r.Source, r.SkipReason)
-				continue
-			}
-			actionVerb := "moved"
-			switch r.Action {
-			case "copy":
-				actionVerb = "copied"
-			case "delete":
-				actionVerb = "deleted"
-			}
-			if r.Action == "delete" {
-				fmt.Printf("deleted %q\n", r.Source)
-			} else {
-				fmt.Printf("%s %q → %s\n", actionVerb, r.Source, r.Destination)
-			}
-			}
-			moved, copied, deleted := 0, 0, 0
-			for _, r := range results {
-				if !r.Skipped {
-					switch r.Action {
-					case "copy":
-						copied++
-					case "delete":
-						deleted++
-					default:
-						moved++
-					}
-				}
-			}
-			summary := ""
-			if moved > 0 {
-				summary += fmt.Sprintf("%d file(s) moved", moved)
-			}
-			if copied > 0 {
-				if summary != "" {
-					summary += ", "
-				}
-				summary += fmt.Sprintf("%d file(s) copied", copied)
-			}
-			if deleted > 0 {
-				if summary != "" {
-					summary += ", "
-				}
-				summary += fmt.Sprintf("%d file(s) deleted", deleted)
-			}
-			if summary == "" {
-				summary = "0 file(s) processed"
-			}
-			fmt.Println(summary)
+		printTickResults(results)
+		fmt.Println(summarizeTickResults(results))
 	})
 	if err != nil {
 		return fmt.Errorf("invalid cron expression: %w", err)

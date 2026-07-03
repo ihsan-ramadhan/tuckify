@@ -71,20 +71,26 @@ func matchName(rule *config.Rule, filename string) bool {
 	}
 	return false
 }
+
+// ruleAppliesToFolder reports whether rule's location restrictions (if any) allow folder.
+// A rule with no configured locations applies to every folder.
+func ruleAppliesToFolder(rule *config.Rule, folder string) bool {
+	locations := rule.LocationsExpanded()
+	if len(locations) == 0 {
+		return true
+	}
+	for _, loc := range locations {
+		if strings.HasPrefix(folder, loc) {
+			return true
+		}
+	}
+	return false
+}
+
 func MatchRule(filename string, info os.FileInfo, rules []config.Rule, folder string) *config.Rule {
 	for i := range rules {
-		// Check if this rule applies to the current folder
-		if len(rules[i].LocationsExpanded()) > 0 {
-			matchesFolder := false
-			for _, loc := range rules[i].LocationsExpanded() {
-				if strings.HasPrefix(folder, loc) {
-					matchesFolder = true
-					break
-				}
-			}
-			if !matchesFolder {
-				continue
-			}
+		if !ruleAppliesToFolder(&rules[i], folder) {
+			continue
 		}
 		if matchMetadata(&rules[i], info) && matchName(&rules[i], filename) {
 			return &rules[i]
