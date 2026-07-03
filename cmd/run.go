@@ -23,6 +23,8 @@ var runCmd = &cobra.Command{
 	Short: "Organize files in folders",
 	Args:  cobra.ArbitraryArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		cmd.SilenceUsage = true
+		
 		cfg, err := config.Load(configPath)
 		if err != nil {
 			return err
@@ -126,12 +128,18 @@ var runCmd = &cobra.Command{
 			if dryRun {
 				if r.Action == "delete" {
 					fmt.Printf("[dry-run] delete %q\n", r.Source)
+					deleted++
 				} else {
 					act := r.Action
 					if act == "" {
 						act = "move"
 					}
 					fmt.Printf("[dry-run] %s %q → %s\n", act, r.Source, r.Destination)
+					if r.Action == "copy" {
+						copied++
+					} else {
+						moved++
+					}
 				}
 			} else {
 				if r.Action == "delete" {
@@ -148,8 +156,29 @@ var runCmd = &cobra.Command{
 			}
 		}
 
-		if !dryRun {
-			summary := ""
+		// Print summary for both dry-run and actual run
+		summary := ""
+		if dryRun {
+			if moved > 0 {
+				summary += fmt.Sprintf("%d file(s) would be moved", moved)
+			}
+			if copied > 0 {
+				if summary != "" {
+					summary += ", "
+				}
+				summary += fmt.Sprintf("%d file(s) would be copied", copied)
+			}
+			if deleted > 0 {
+				if summary != "" {
+					summary += ", "
+				}
+				summary += fmt.Sprintf("%d file(s) would be deleted", deleted)
+			}
+			if summary == "" {
+				summary = "0 file(s) would be processed"
+			}
+			fmt.Printf("\n[dry-run] %s\n", summary)
+		} else {
 			if moved > 0 {
 				summary += fmt.Sprintf("%d file(s) moved", moved)
 			}

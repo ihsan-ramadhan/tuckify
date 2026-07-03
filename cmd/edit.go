@@ -16,6 +16,8 @@ var editCmd = &cobra.Command{
 	Short: "Update an existing schedule's cron, folder, or config",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		cmd.SilenceUsage = true
+		
 		name := args[0]
 
 		found, err := store.Find(name)
@@ -93,7 +95,7 @@ var editCmd = &cobra.Command{
 			if err := srv.Uninstall(name); err != nil {
 				return fmt.Errorf("stop service: %w", err)
 			}
-			if err := srv.Install(updated.Name, updated.Folder, updated.Cron, updated.Config); err != nil {
+			if err := srv.Install(updated.Name, updated.GetFolders(), updated.Cron, updated.Config); err != nil {
 				return fmt.Errorf("restart service: %w", err)
 			}
 			fmt.Println("  service restarted")

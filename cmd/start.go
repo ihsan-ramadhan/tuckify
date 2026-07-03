@@ -13,6 +13,7 @@ var startCmd = &cobra.Command{
 	Short: "Activate a saved schedule as a system service",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		cmd.SilenceUsage = true
 		name := args[0]
 
 		found, err := store.Find(name)
@@ -28,7 +29,7 @@ var startCmd = &cobra.Command{
 			return err
 		}
 
-		if err := srv.Install(found.Name, found.Folder, found.Cron, found.Config); err != nil {
+		if err := srv.Install(found.Name, found.GetFolders(), found.Cron, found.Config); err != nil {
 			return fmt.Errorf("start service: %w", err)
 		}
 
@@ -42,6 +43,7 @@ var stopCmd = &cobra.Command{
 	Short: "Deactivate a schedule's system service (keeps in list)",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		cmd.SilenceUsage = true
 		name := args[0]
 
 		srv, err := service.NewService()

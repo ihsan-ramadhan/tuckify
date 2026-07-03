@@ -73,7 +73,7 @@ tuckify run ~/Downloads --dry-run        # preview without moving
 |---|---|
 | `run [folders...]` | Organize files in one or more folders. If no folders are specified, it automatically processes all unique directories defined in rule `locations`. |
 | `undo` | Undo the last `tuckify run` (restores moved files) |
-| `schedule` | Save a named schedule (`--run` to also start interactively) |
+| `schedule` | Save a named schedule (accepts one or more folders, use `--start` to run as service, `--run` to run in foreground) |
 | `list` | Show all saved schedules and their status |
 | `edit` | Update an existing schedule's cron, folder, or config |
 | `start` | Activate a saved schedule as a background service |
@@ -88,19 +88,22 @@ tuckify run ~/Downloads --dry-run        # preview without moving
 ### Schedule lifecycle
 
 ```bash
-# save a schedule
-tuckify schedule downloads ~/Downloads --cron "0 9 * * *"
+# save a schedule and start it as a background service immediately
+tuckify schedule downloads ~/Downloads ~/Desktop --cron "0 9 * * *" --start
 
-# activate as a background service
+# or save a schedule first
+tuckify schedule downloads ~/Downloads ~/Desktop --cron "0 9 * * *"
+
+# and activate it as a background service later
 tuckify start downloads
 
-# check status
+# check status (shows SERVICE status column)
 tuckify list
 
 # install all saved schedules as system services (survives reboot)
 tuckify startup
 
-# remove
+# remove schedule and stop its service
 tuckify delete downloads
 ```
 

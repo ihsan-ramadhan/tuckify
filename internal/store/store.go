@@ -7,11 +7,23 @@ import (
 )
 
 type Schedule struct {
-	Name      string `json:"name"`
-	Folder    string `json:"folder"`
-	Cron      string `json:"cron"`
-	Config    string `json:"config,omitempty"`
-	Recursive bool   `json:"recursive,omitempty"`
+	Name      string   `json:"name"`
+	Folder    string   `json:"folder,omitempty"`
+	Folders   []string `json:"folders,omitempty"`
+	Cron      string   `json:"cron"`
+	Config    string   `json:"config,omitempty"`
+	Recursive bool     `json:"recursive,omitempty"`
+	Yes       bool     `json:"yes,omitempty"`
+}
+
+func (s *Schedule) GetFolders() []string {
+	if len(s.Folders) > 0 {
+		return s.Folders
+	}
+	if s.Folder != "" {
+		return []string{s.Folder}
+	}
+	return nil
 }
 
 func storePath() string {

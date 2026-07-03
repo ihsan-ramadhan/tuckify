@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -28,8 +29,8 @@ func ResolveConfigPath(name, configPath string) string {
 	return config.DefaultConfigPath()
 }
 
-func runTick(name, folder, configPath string) ([]organizer.Result, error) {
-	fmt.Printf("[%s] running organizer on %s\n", time.Now().Format("2006-01-02 15:04:05"), folder)
+func runTick(name string, folders []string, configPath string) ([]organizer.Result, error) {
+	fmt.Printf("[%s] running organizer on folders: %s\n", time.Now().Format("2006-01-02 15:04:05"), strings.Join(folders, ", "))
 	actualPath := ResolveConfigPath(name, configPath)
 	cfg, err := config.Load(actualPath)
 	if err != nil {
@@ -41,14 +42,23 @@ func runTick(name, folder, configPath string) ([]organizer.Result, error) {
 		recursive = s.Recursive
 	}
 
-	return organizer.Organize(folder, cfg, false, recursive)
+	var allResults []organizer.Result
+	for _, folder := range folders {
+		results, err := organizer.Organize(folder, cfg, false, recursive)
+		if err != nil {
+			return nil, fmt.Errorf("organize %q: %w", folder, err)
+		}
+		allResults = append(allResults, results...)
+	}
+
+	return allResults, nil
 }
 
-func Run(name, folder, expr, configPath string) error {
+func Run(name string, folders []string, expr, configPath string) error {
 	c := cron.New()
 
 	_, err := c.AddFunc(expr, func() {
-		results, err := runTick(name, folder, configPath)
+		results, err := runTick(name, folders, configPath)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			return

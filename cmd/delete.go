@@ -13,24 +13,29 @@ var deleteCmd = &cobra.Command{
 	Short: "Remove a saved schedule",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		cmd.SilenceUsage = true
 		name := args[0]
-
-		found, err := store.Delete(name)
-		if err != nil {
-			return fmt.Errorf("delete from store: %w", err)
-		}
-		if !found {
-			return fmt.Errorf("schedule %q not found", name)
-		}
 
 		srv, err := service.NewService()
 		if err != nil {
 			return err
 		}
-		exists, _ := srv.Exists(name)
-		if exists {
-			if err := srv.Uninstall(name); err != nil {
-				fmt.Printf("warning: could not remove system service for %q: %v\n", name, err)
+
+		// Always try to uninstall service (handles non-existent gracefully)
+		if err := srv.Uninstall(name); err != nil {
+			fmt.Printf("warning: could not remove system service for %q: %v\n", name, err)
+		}
+
+		found, err := store.Delete(name)
+		if err != nil {
+			return fmt.Errorf("delete from store: %w", err)
+		}
+
+		if !found {
+			// Check if service existed even though store entry didn't
+			exists, _ := srv.Exists(name)
+			if !exists {
+				return fmt.Errorf("schedule %q not found", name)
 			}
 		}
 
