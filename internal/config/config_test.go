@@ -39,6 +39,25 @@ destination = "~/Documents/PDF"
 	}
 }
 
+func TestLoadInvalidConflictStrategy(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "rules.toml")
+	content := `
+[settings]
+conflict_strategy = "renam"
+
+[[rule]]
+name        = "PDF"
+extensions  = [".pdf"]
+destination = "~/Documents/PDF"
+`
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(path); err == nil {
+		t.Fatal("expected error for invalid conflict_strategy, got nil")
+	}
+}
+
 func TestLoadMissingFile(t *testing.T) {
 	cfg, err := Load(filepath.Join(t.TempDir(), "nope.toml"))
 	if err != nil {

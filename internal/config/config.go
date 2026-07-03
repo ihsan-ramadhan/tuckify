@@ -214,6 +214,17 @@ func compileRuleRegexes(r *Rule) error {
 	return nil
 }
 
+var validConflictStrategies = map[string]bool{
+	"rename": true, "skip": true, "overwrite": true, "delete_duplicate": true, "ask": true,
+}
+
+func validateConflictStrategy(s string) error {
+	if s == "" || validConflictStrategies[s] {
+		return nil
+	}
+	return fmt.Errorf("invalid conflict_strategy %q (must be one of: rename, skip, overwrite, delete_duplicate, ask)", s)
+}
+
 func validateAndParseRule(r *Rule) error {
 	if r.Action == "" {
 		r.Action = "move"
@@ -256,6 +267,9 @@ func Load(path string) (*Config, error) {
 
 	if cfg.Settings.ConflictStrategy == "" {
 		cfg.Settings.ConflictStrategy = "rename"
+	}
+	if err := validateConflictStrategy(cfg.Settings.ConflictStrategy); err != nil {
+		return nil, err
 	}
 	for i := range cfg.Rules {
 		if err := validateAndParseRule(&cfg.Rules[i]); err != nil {
