@@ -104,7 +104,7 @@ var runCmd = &cobra.Command{
 				}
 			}
 			if len(histEntries) > 0 {
-				_ = history.Save(histEntries)
+				_ = history.Save(folders, histEntries)
 			}
 		}
 
