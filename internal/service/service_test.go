@@ -38,17 +38,17 @@ func TestNewService(t *testing.T) {
 func TestSystemdContent(t *testing.T) {
 	name := "downloads"
 	binary := "/usr/bin/tuckify"
-	folder := "/data"
+	folders := []string{"/data"}
 	cronExpr := "0 9 * * *"
 	cfgPath := "/etc/tuckify.toml"
 
-	content := buildSystemdContent(name, binary, folder, cronExpr, cfgPath)
+	content := buildSystemdContent(name, binary, folders, cronExpr, cfgPath)
 	expected := `[Unit]
 Description=tuckify file organizer (downloads)
 After=default.target
 
 [Service]
-ExecStart=/usr/bin/tuckify schedule downloads /data --cron "0 9 * * *" --run --config /etc/tuckify.toml
+ExecStart=/usr/bin/tuckify schedule downloads "/data" --cron "0 9 * * *" --run --config "/etc/tuckify.toml"
 Restart=on-failure
 RestartSec=5s
 
@@ -59,13 +59,13 @@ WantedBy=default.target
 		t.Errorf("expected %q, got %q", expected, content)
 	}
 
-	contentNoCfg := buildSystemdContent(name, binary, folder, cronExpr, "")
+	contentNoCfg := buildSystemdContent(name, binary, folders, cronExpr, "")
 	expectedNoCfg := `[Unit]
 Description=tuckify file organizer (downloads)
 After=default.target
 
 [Service]
-ExecStart=/usr/bin/tuckify schedule downloads /data --cron "0 9 * * *" --run
+ExecStart=/usr/bin/tuckify schedule downloads "/data" --cron "0 9 * * *" --run
 Restart=on-failure
 RestartSec=5s
 
@@ -80,11 +80,11 @@ WantedBy=default.target
 func TestLaunchdContent(t *testing.T) {
 	name := "downloads"
 	binary := "/usr/bin/tuckify"
-	folder := "/data"
+	folders := []string{"/data"}
 	cronExpr := "0 9 * * *"
 	cfgPath := "/etc/tuckify.toml"
 
-	content := buildLaunchdContent(name, binary, folder, cronExpr, cfgPath)
+	content := buildLaunchdContent(name, binary, folders, cronExpr, cfgPath)
 	expected := `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -114,7 +114,7 @@ func TestLaunchdContent(t *testing.T) {
 		t.Errorf("expected %q, got %q", expected, content)
 	}
 
-	contentNoCfg := buildLaunchdContent(name, binary, folder, cronExpr, "")
+	contentNoCfg := buildLaunchdContent(name, binary, folders, cronExpr, "")
 	expectedNoCfg := `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -146,24 +146,24 @@ func TestLaunchdContent(t *testing.T) {
 func TestCrontabUpsert(t *testing.T) {
 	initial := "* * * * * old-job\n"
 	binary := "/usr/bin/tuckify"
-	folder := "/data"
+	folders := []string{"/data"}
 	cronExpr := "0 9 * * *"
 	name := "downloads"
 
-	result := upsertCrontabContent(initial, name, binary, folder, cronExpr, "/etc/tuckify.toml")
-	expected := "* * * * * old-job\n0 9 * * * /usr/bin/tuckify run /data --config /etc/tuckify.toml # tuckify-managed:downloads\n"
+	result := upsertCrontabContent(initial, name, binary, folders, cronExpr, "/etc/tuckify.toml")
+	expected := "* * * * * old-job\n0 9 * * * /usr/bin/tuckify schedule downloads \"/data\" --cron \"0 9 * * *\" --run --config \"/etc/tuckify.toml\" # tuckify-managed:downloads\n"
 	if result != expected {
 		t.Errorf("expected %q, got %q", expected, result)
 	}
 
-	resultNoCfg := upsertCrontabContent(initial, name, binary, folder, cronExpr, "")
-	expectedNoCfg := "* * * * * old-job\n0 9 * * * /usr/bin/tuckify run /data # tuckify-managed:downloads\n"
+	resultNoCfg := upsertCrontabContent(initial, name, binary, folders, cronExpr, "")
+	expectedNoCfg := "* * * * * old-job\n0 9 * * * /usr/bin/tuckify schedule downloads \"/data\" --cron \"0 9 * * *\" --run # tuckify-managed:downloads\n"
 	if resultNoCfg != expectedNoCfg {
 		t.Errorf("expected %q, got %q", expectedNoCfg, resultNoCfg)
 	}
 
 	// upsert same name replaces existing line
-	updated := upsertCrontabContent(result, name, binary, folder, "0 18 * * *", "")
+	updated := upsertCrontabContent(result, name, binary, folders, "0 18 * * *", "")
 	if strings.Count(updated, "tuckify-managed:downloads") != 1 {
 		t.Errorf("upsert should replace existing entry, got: %q", updated)
 	}
@@ -202,19 +202,19 @@ func TestCrontabRemove(t *testing.T) {
 
 func TestWintaskCmd(t *testing.T) {
 	name := "downloads"
-	binary := `C:\tuckify.exe`
-	folder := `C:\data`
+	binary := `C:	uckify.exe`
+	folders := []string{`C:\data`}
 	cronExpr := "0 9 * * *"
 	cfgPath := `C:\config.toml`
 
-	cmd := buildWintaskCmd(name, binary, folder, cronExpr, cfgPath)
-	expected := `"` + binary + `" schedule "` + name + `" "` + folder + `" --cron "` + cronExpr + `" --run` + ` --config "` + cfgPath + `"`
+	cmd := buildWintaskCmd(name, binary, folders, cronExpr, cfgPath)
+	expected := `"` + binary + `" schedule "` + name + `" "` + folders[0] + `" --cron "` + cronExpr + `" --run` + ` --config "` + cfgPath + `"`
 	if cmd != expected {
 		t.Errorf("expected %q, got %q", expected, cmd)
 	}
 
-	cmdNoCfg := buildWintaskCmd(name, binary, folder, cronExpr, "")
-	expectedNoCfg := `"` + binary + `" schedule "` + name + `" "` + folder + `" --cron "` + cronExpr + `" --run`
+	cmdNoCfg := buildWintaskCmd(name, binary, folders, cronExpr, "")
+	expectedNoCfg := `"` + binary + `" schedule "` + name + `" "` + folders[0] + `" --cron "` + cronExpr + `" --run`
 	if cmdNoCfg != expectedNoCfg {
 		t.Errorf("expected %q, got %q", expectedNoCfg, cmdNoCfg)
 	}

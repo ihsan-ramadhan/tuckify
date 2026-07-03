@@ -5,8 +5,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/fatih/color"
+	"github.com/ihsan-ramadhan/tuckify/internal/ansi"
 	"github.com/ihsan-ramadhan/tuckify/internal/config"
+	"github.com/ihsan-ramadhan/tuckify/internal/history"
 	"github.com/ihsan-ramadhan/tuckify/internal/organizer"
 	"github.com/spf13/cobra"
 )
@@ -18,35 +19,57 @@ var (
 )
 
 var runCmd = &cobra.Command{
-	Use:   "run <folder>",
-	Short: "Organize files in a folder",
-	Args:  cobra.ExactArgs(1),
+	Use:   "run [folders...]",
+	Short: "Organize files in folders",
+	Args:  cobra.ArbitraryArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		folder := args[0]
-
-		if _, err := os.Stat(folder); os.IsNotExist(err) {
-			return fmt.Errorf("folder not found: %s", folder)
-		}
-
+		cmd.SilenceUsage = true
+		
 		cfg, err := config.Load(configPath)
 		if err != nil {
 			return err
 		}
 		warnNoRules(cfg, configPath)
 
-		if !dryRun && !yesFlag {
-			previewResults, err := organizer.Organize(folder, cfg, true, recursive)
-			if err != nil {
-				return err
+		var folders []string
+		if len(args) > 0 {
+			folders = args
+		} else {
+			seen := make(map[string]bool)
+			for _, r := range cfg.Rules {
+				for _, loc := range r.LocationsExpanded() {
+					if !seen[loc] {
+						seen[loc] = true
+						folders = append(folders, loc)
+					}
+				}
 			}
+			if len(folders) == 0 {
+				return fmt.Errorf("no folders specified and no locations defined in config rules")
+			}
+		}
+
+		for _, f := range folders {
+			if _, err := os.Stat(f); os.IsNotExist(err) {
+				return fmt.Errorf("folder not found: %s", f)
+			}
+		}
+
+		if !dryRun && !yesFlag {
 			deletions := 0
-			for _, r := range previewResults {
-				if !r.Skipped && r.Action == "delete" {
-					deletions++
+			for _, f := range folders {
+				previewResults, err := organizer.Organize(f, cfg, true, recursive)
+				if err != nil {
+					return err
+				}
+				for _, r := range previewResults {
+					if !r.Skipped && r.Action == "delete" {
+						deletions++
+					}
 				}
 			}
 			if deletions > 0 {
-				color.Red("warning: this operation will delete %d file(s).", deletions)
+				ansi.PrintRed("warning: this operation will delete %d file(s).\n", deletions)
 				fmt.Print("confirm deletion? [y/N]: ")
 				var response string
 				if _, err := fmt.Scanln(&response); err != nil {
@@ -59,17 +82,38 @@ var runCmd = &cobra.Command{
 			}
 		}
 
-		results, err := organizer.Organize(folder, cfg, dryRun, recursive)
-		if err != nil {
-			return err
+		var allResults []organizer.Result
+		for _, f := range folders {
+			results, err := organizer.Organize(f, cfg, dryRun, recursive)
+			if err != nil {
+				return err
+			}
+			allResults = append(allResults, results...)
+		}
+
+		// save history for undo (only on real run)
+		if !dryRun {
+			var histEntries []history.Entry
+			for _, r := range allResults {
+				if !r.Skipped && (r.Action == "" || r.Action == "move") {
+					histEntries = append(histEntries, history.Entry{
+						Src:    r.Source,
+						Dest:   r.Destination,
+						Action: "move",
+					})
+				}
+			}
+			if len(histEntries) > 0 {
+				_ = history.Save(histEntries)
+			}
 		}
 
 		moved := 0
 		copied := 0
 		deleted := 0
-		for _, r := range results {
+		for _, r := range allResults {
 			if r.Skipped {
-				color.Yellow("skipped %s: %s", r.Source, r.SkipReason)
+				ansi.PrintYellow("skipped %s: %s\n", r.Source, r.SkipReason)
 				continue
 			}
 
@@ -84,12 +128,18 @@ var runCmd = &cobra.Command{
 			if dryRun {
 				if r.Action == "delete" {
 					fmt.Printf("[dry-run] delete %q\n", r.Source)
+					deleted++
 				} else {
 					act := r.Action
 					if act == "" {
 						act = "move"
 					}
 					fmt.Printf("[dry-run] %s %q → %s\n", act, r.Source, r.Destination)
+					if r.Action == "copy" {
+						copied++
+					} else {
+						moved++
+					}
 				}
 			} else {
 				if r.Action == "delete" {
@@ -106,8 +156,29 @@ var runCmd = &cobra.Command{
 			}
 		}
 
-		if !dryRun {
-			summary := ""
+		// Print summary for both dry-run and actual run
+		summary := ""
+		if dryRun {
+			if moved > 0 {
+				summary += fmt.Sprintf("%d file(s) would be moved", moved)
+			}
+			if copied > 0 {
+				if summary != "" {
+					summary += ", "
+				}
+				summary += fmt.Sprintf("%d file(s) would be copied", copied)
+			}
+			if deleted > 0 {
+				if summary != "" {
+					summary += ", "
+				}
+				summary += fmt.Sprintf("%d file(s) would be deleted", deleted)
+			}
+			if summary == "" {
+				summary = "0 file(s) would be processed"
+			}
+			fmt.Printf("\n[dry-run] %s\n", summary)
+		} else {
 			if moved > 0 {
 				summary += fmt.Sprintf("%d file(s) moved", moved)
 			}

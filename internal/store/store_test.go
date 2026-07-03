@@ -3,6 +3,7 @@ package store
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -45,7 +46,7 @@ func TestUpsertAndLoad(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(ss) != 1 || ss[0] != s {
+	if len(ss) != 1 || !reflect.DeepEqual(ss[0], s) {
 		t.Errorf("expected [%v], got %v", s, ss)
 	}
 }
@@ -100,7 +101,7 @@ func TestFind(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if found == nil || *found != s {
+	if found == nil || !reflect.DeepEqual(*found, s) {
 		t.Errorf("expected to find %v, got %v", s, found)
 	}
 

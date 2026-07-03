@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 )
 
 const (
@@ -17,13 +18,13 @@ func NewWintaskService() *WintaskService {
 	return &WintaskService{}
 }
 
-func (w *WintaskService) Install(name, folder, cronExpr, configPath string) error {
+func (w *WintaskService) Install(name string, folders []string, cronExpr, configPath string) error {
 	binaryPath, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("get executable path: %w", err)
 	}
 
-	execCmd := buildWintaskCmd(name, binaryPath, folder, cronExpr, configPath)
+	execCmd := buildWintaskCmd(name, binaryPath, folders, cronExpr, configPath)
 	taskName := wintaskPrefix + name
 
 	winSch, err := exec.LookPath(schtasksCmd)
@@ -75,8 +76,12 @@ func (w *WintaskService) Logs(name string, follow bool, lines int) error {
 	return fmt.Errorf("logs not available for Windows Task Scheduler — check Event Viewer")
 }
 
-func buildWintaskCmd(name, binaryPath, folder, cronExpr, configPath string) string {
-	execCmd := fmt.Sprintf(`"%s" schedule "%s" "%s" --cron "%s" --run`, binaryPath, name, folder, cronExpr)
+func buildWintaskCmd(name, binaryPath string, folders []string, cronExpr, configPath string) string {
+	escapedFolders := make([]string, len(folders))
+	for i, f := range folders {
+		escapedFolders[i] = fmt.Sprintf(`"%s"`, f)
+	}
+	execCmd := fmt.Sprintf(`"%s" schedule "%s" %s --cron "%s" --run`, binaryPath, name, strings.Join(escapedFolders, " "), cronExpr)
 	if configPath != "" {
 		execCmd += fmt.Sprintf(` --config "%s"`, configPath)
 	}

@@ -32,7 +32,7 @@ func systemdServiceDir() string {
 	return filepath.Join(home, ".config", "systemd", "user")
 }
 
-func (s *SystemdService) Install(name, folder, cronExpr, configPath string) error {
+func (s *SystemdService) Install(name string, folders []string, cronExpr, configPath string) error {
 	binaryPath, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("get executable path: %w", err)
@@ -43,7 +43,7 @@ func (s *SystemdService) Install(name, folder, cronExpr, configPath string) erro
 		return fmt.Errorf("create systemd directory: %w", err)
 	}
 
-	content := buildSystemdContent(name, binaryPath, folder, cronExpr, configPath)
+	content := buildSystemdContent(name, binaryPath, folders, cronExpr, configPath)
 	if err := os.WriteFile(servicePath, []byte(content), 0o644); err != nil {
 		return fmt.Errorf("write systemd service file: %w", err)
 	}
@@ -97,7 +97,9 @@ func (s *SystemdService) removeOne(sysctl, name string) error {
 	unitName := systemdPrefix + name
 
 	if _, err := os.Stat(servicePath); err == nil {
-		_ = exec.Command(sysctl, systemdUserFlag, "disable", "--now", unitName).Run()
+		if err := exec.Command(sysctl, systemdUserFlag, "disable", "--now", unitName).Run(); err != nil {
+			return fmt.Errorf("stop service %q: %w", name, err)
+		}
 	}
 
 	if err := os.Remove(servicePath); err != nil && !os.IsNotExist(err) {
@@ -148,10 +150,14 @@ func (s *SystemdService) Logs(name string, follow bool, lines int) error {
 	return cmd.Run()
 }
 
-func buildSystemdContent(name, binaryPath, folder, cronExpr, configPath string) string {
-	execStart := fmt.Sprintf("%s schedule %s %s --cron %q --run", binaryPath, name, folder, cronExpr)
+func buildSystemdContent(name, binaryPath string, folders []string, cronExpr, configPath string) string {
+	escapedFolders := make([]string, len(folders))
+	for i, f := range folders {
+		escapedFolders[i] = fmt.Sprintf("%q", f)
+	}
+	execStart := fmt.Sprintf("%s schedule %s %s --cron %q --run", binaryPath, name, strings.Join(escapedFolders, " "), cronExpr)
 	if configPath != "" {
-		execStart += fmt.Sprintf(" --config %s", configPath)
+		execStart += fmt.Sprintf(" --config %q", configPath)
 	}
 
 	return fmt.Sprintf(`[Unit]

@@ -36,7 +36,7 @@ func launchdLabel(name string) string {
 	return launchdBaseLabel + "." + name
 }
 
-func (l *LaunchdService) Install(name, folder, cronExpr, configPath string) error {
+func (l *LaunchdService) Install(name string, folders []string, cronExpr, configPath string) error {
 	binaryPath, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("get executable path: %w", err)
@@ -47,7 +47,7 @@ func (l *LaunchdService) Install(name, folder, cronExpr, configPath string) erro
 		return fmt.Errorf("create LaunchAgents directory: %w", err)
 	}
 
-	content := buildLaunchdContent(name, binaryPath, folder, cronExpr, configPath)
+	content := buildLaunchdContent(name, binaryPath, folders, cronExpr, configPath)
 	if err := os.WriteFile(plistPath, []byte(content), 0o644); err != nil {
 		return fmt.Errorf("write plist file: %w", err)
 	}
@@ -123,20 +123,21 @@ func (l *LaunchdService) Logs(name string, follow bool, lines int) error {
 	return fmt.Errorf("logs not available for launchd — check Console.app or ~/Library/Logs")
 }
 
-func buildLaunchdContent(name, binaryPath, folder, cronExpr, configPath string) string {
-	argsXml := fmt.Sprintf(`        <string>%s</string>
-        <string>schedule</string>
-        <string>%s</string>
-        <string>%s</string>
-        <string>--cron</string>
-        <string>%s</string>
-        <string>--run</string>
-`, binaryPath, name, folder, cronExpr)
+func buildLaunchdContent(name, binaryPath string, folders []string, cronExpr, configPath string) string {
+	var argsXml strings.Builder
+	fmt.Fprintf(&argsXml, "        <string>%s</string>\n", binaryPath)
+	argsXml.WriteString("        <string>schedule</string>\n")
+	fmt.Fprintf(&argsXml, "        <string>%s</string>\n", name)
+	for _, f := range folders {
+		fmt.Fprintf(&argsXml, "        <string>%s</string>\n", f)
+	}
+	argsXml.WriteString("        <string>--cron</string>\n")
+	fmt.Fprintf(&argsXml, "        <string>%s</string>\n", cronExpr)
+	argsXml.WriteString("        <string>--run</string>\n")
 
 	if configPath != "" {
-		argsXml += fmt.Sprintf(`        <string>--config</string>
-        <string>%s</string>
-`, configPath)
+		argsXml.WriteString("        <string>--config</string>\n")
+		fmt.Fprintf(&argsXml, "        <string>%s</string>\n", configPath)
 	}
 
 	return fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
@@ -154,5 +155,5 @@ func buildLaunchdContent(name, binaryPath, folder, cronExpr, configPath string) 
     <true/>
 </dict>
 </plist>
-`, launchdLabel(name), argsXml)
+`, launchdLabel(name), argsXml.String())
 }

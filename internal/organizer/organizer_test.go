@@ -21,13 +21,13 @@ func TestMatchRule(t *testing.T) {
 		{Extensions: []string{".pdf"}, Destination: "/docs"},
 		{Extensions: []string{".jpg", ".PNG"}, Destination: "/pics"},
 	}
-	if r := MatchRule("file.PDF", nil, rules); r == nil || r.Destination != "/docs" {
+	if r := MatchRule("file.PDF", nil, rules, "/test"); r == nil || r.Destination != "/docs" {
 		t.Error("expected PDF rule match")
 	}
-	if r := MatchRule("file.png", nil, rules); r == nil || r.Destination != "/pics" {
+	if r := MatchRule("file.png", nil, rules, "/test"); r == nil || r.Destination != "/pics" {
 		t.Error("expected PNG rule match")
 	}
-	if MatchRule("noext", nil, rules) != nil {
+	if MatchRule("noext", nil, rules, "/test") != nil {
 		t.Error("expected no match for file without extension")
 	}
 }
@@ -52,7 +52,7 @@ func TestMatchRuleFilenamePattern(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		r := MatchRule(c.file, nil, rules)
+		r := MatchRule(c.file, nil, rules, "/test")
 		if c.wantNil && r != nil {
 			t.Errorf("%s: expected no match, got %s", c.file, r.Destination)
 		}
@@ -411,6 +411,89 @@ func TestOrganizeRecursive(t *testing.T) {
 
 	if _, err := os.Stat(subDir); !os.IsNotExist(err) {
 		t.Error("expected empty subdirectories to be deleted")
+	}
+}
+
+func TestMatchRuleFilenameRegex(t *testing.T) {
+	dir := t.TempDir()
+	dest := filepath.Join(dir, "matched")
+	_ = os.MkdirAll(dest, 0o755)
+
+	for _, f := range []string{"invoice_2024.pdf", "report_final.txt"} {
+		_ = os.WriteFile(filepath.Join(dir, f), []byte("data"), 0o644)
+	}
+
+	content := `
+[[rule]]
+name           = "Invoice regex"
+filename_regex = ["^invoice_\\d{4}\\.pdf$"]
+destination    = '` + dest + `'
+action         = "move"
+`
+	results := runTestOrganize(t, dir, content)
+	if filepath.Base(results[0].Source) != "invoice_2024.pdf" {
+		t.Errorf("expected invoice_2024.pdf, got %s", filepath.Base(results[0].Source))
+	}
+}
+
+func TestMatchRuleFilenameRegexNoMatch(t *testing.T) {
+	dir := t.TempDir()
+	dest := filepath.Join(dir, "matched")
+	_ = os.MkdirAll(dest, 0o755)
+
+	_ = os.WriteFile(filepath.Join(dir, "report_final.txt"), []byte("data"), 0o644)
+
+	content := `
+[[rule]]
+name           = "Invoice regex"
+filename_regex = ["^invoice_\\d{4}\\.pdf$"]
+destination    = '` + dest + `'
+action         = "move"
+`
+	path := filepath.Join(t.TempDir(), "rules.toml")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfgParsed, err := config.Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	results, err := Organize(dir, cfgParsed, false, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 0 {
+		t.Errorf("expected 0 results for non-matching regex, got %d", len(results))
+	}
+}
+
+func TestMatchRuleLocations(t *testing.T) {
+	rules := []config.Rule{
+		{Locations: []string{"/home/user/Downloads"}, Extensions: []string{".pdf"}, Destination: "/docs"},
+		{Locations: []string{"/home/user/Desktop"}, Extensions: []string{".jpg"}, Destination: "/pics"},
+	}
+	// Rule 1 should match for Downloads folder
+	if r := MatchRule("file.pdf", nil, rules, "/home/user/Downloads"); r == nil || r.Destination != "/docs" {
+		t.Error("expected PDF rule match for Downloads")
+	}
+	// Rule 2 should match for Desktop folder
+	if r := MatchRule("file.jpg", nil, rules, "/home/user/Desktop"); r == nil || r.Destination != "/pics" {
+		t.Error("expected JPG rule match for Desktop")
+	}
+	// Rule 1 should NOT match for Desktop folder
+	if MatchRule("file.pdf", nil, rules, "/home/user/Desktop") != nil {
+		t.Error("expected no match for PDF in Desktop folder")
+	}
+	// Rule 2 should NOT match for Downloads folder
+	if MatchRule("file.jpg", nil, rules, "/home/user/Downloads") != nil {
+		t.Error("expected no match for JPG in Downloads folder")
+	}
+	// Rule without locations should match anywhere
+	rulesNoLoc := []config.Rule{
+		{Extensions: []string{".txt"}, Destination: "/text"},
+	}
+	if r := MatchRule("file.txt", nil, rulesNoLoc, "/any/folder"); r == nil || r.Destination != "/text" {
+		t.Error("expected txt rule match without locations")
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -28,70 +29,12 @@ func ResolveConfigPath(name, configPath string) string {
 	return config.DefaultConfigPath()
 }
 
-func printSingleResult(r organizer.Result, moved, copied, deleted *int) {
-	if r.Skipped {
-		fmt.Fprintf(os.Stderr, "skipped %s: %s\n", r.Source, r.SkipReason)
-		return
-	}
-
-	actionVerb := "moved"
-	switch r.Action {
-	case "copy":
-		actionVerb = "copied"
-	case "delete":
-		actionVerb = "deleted"
-	}
-
-	if r.Action == "delete" {
-		fmt.Printf("deleted %q\n", r.Source)
-		*deleted++
-	} else {
-		fmt.Printf("%s %q → %s\n", actionVerb, r.Source, r.Destination)
-		if r.Action == "copy" {
-			*copied++
-		} else {
-			*moved++
-		}
-	}
-}
-
-func printResults(results []organizer.Result) {
-	moved := 0
-	copied := 0
-	deleted := 0
-	for _, r := range results {
-		printSingleResult(r, &moved, &copied, &deleted)
-	}
-
-	summary := ""
-	if moved > 0 {
-		summary += fmt.Sprintf("%d file(s) moved", moved)
-	}
-	if copied > 0 {
-		if summary != "" {
-			summary += ", "
-		}
-		summary += fmt.Sprintf("%d file(s) copied", copied)
-	}
-	if deleted > 0 {
-		if summary != "" {
-			summary += ", "
-		}
-		summary += fmt.Sprintf("%d file(s) deleted", deleted)
-	}
-	if summary == "" {
-		summary = "0 file(s) processed"
-	}
-	fmt.Println(summary)
-}
-
-func runTick(name, folder, configPath string) {
-	fmt.Printf("[%s] running organizer on %s\n", time.Now().Format("2006-01-02 15:04:05"), folder)
+func runTick(name string, folders []string, configPath string) ([]organizer.Result, error) {
+	fmt.Printf("[%s] running organizer on folders: %s\n", time.Now().Format("2006-01-02 15:04:05"), strings.Join(folders, ", "))
 	actualPath := ResolveConfigPath(name, configPath)
 	cfg, err := config.Load(actualPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error loading config: %v\n", err)
-		return
+		return nil, fmt.Errorf("load config: %w", err)
 	}
 
 	recursive := false
@@ -99,19 +42,91 @@ func runTick(name, folder, configPath string) {
 		recursive = s.Recursive
 	}
 
-	results, err := organizer.Organize(folder, cfg, false, recursive)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		return
+	var allResults []organizer.Result
+	for _, folder := range folders {
+		results, err := organizer.Organize(folder, cfg, false, recursive)
+		if err != nil {
+			return nil, fmt.Errorf("organize %q: %w", folder, err)
+		}
+		allResults = append(allResults, results...)
 	}
-	printResults(results)
+
+	return allResults, nil
 }
 
-func Run(name, folder, expr, configPath string) error {
+// resultActionVerb maps a Result.Action to its past-tense display verb.
+func resultActionVerb(action string) string {
+	switch action {
+	case "copy":
+		return "copied"
+	case "delete":
+		return "deleted"
+	default:
+		return "moved"
+	}
+}
+
+// printTickResults prints one line per non-skipped/skipped result.
+// ponytail: extracted from Run's closure to reduce cognitive complexity (SonarQube go:S3776).
+func printTickResults(results []organizer.Result) {
+	for _, r := range results {
+		if r.Skipped {
+			fmt.Fprintf(os.Stderr, "skipped %s: %s\n", r.Source, r.SkipReason)
+			continue
+		}
+		if r.Action == "delete" {
+			fmt.Printf("deleted %q\n", r.Source)
+			continue
+		}
+		fmt.Printf("%s %q → %s\n", resultActionVerb(r.Action), r.Source, r.Destination)
+	}
+}
+
+// summarizeTickResults builds the "N file(s) moved, M file(s) copied, ..." summary line.
+func summarizeTickResults(results []organizer.Result) string {
+	moved, copied, deleted := 0, 0, 0
+	for _, r := range results {
+		if r.Skipped {
+			continue
+		}
+		switch r.Action {
+		case "copy":
+			copied++
+		case "delete":
+			deleted++
+		default:
+			moved++
+		}
+	}
+
+	var parts []string
+	if moved > 0 {
+		parts = append(parts, fmt.Sprintf("%d file(s) moved", moved))
+	}
+	if copied > 0 {
+		parts = append(parts, fmt.Sprintf("%d file(s) copied", copied))
+	}
+	if deleted > 0 {
+		parts = append(parts, fmt.Sprintf("%d file(s) deleted", deleted))
+	}
+	if len(parts) == 0 {
+		return "0 file(s) processed"
+	}
+	return strings.Join(parts, ", ")
+}
+
+func Run(name string, folders []string, expr, configPath string) error {
 	c := cron.New()
 
 	_, err := c.AddFunc(expr, func() {
-		runTick(name, folder, configPath)
+		results, err := runTick(name, folders, configPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			return
+		}
+		// ponytail: print moved to cmd layer (avoid duplication)
+		printTickResults(results)
+		fmt.Println(summarizeTickResults(results))
 	})
 	if err != nil {
 		return fmt.Errorf("invalid cron expression: %w", err)

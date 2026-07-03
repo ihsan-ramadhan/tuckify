@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/fatih/color"
+	"github.com/ihsan-ramadhan/tuckify/internal/ansi"
 	"github.com/ihsan-ramadhan/tuckify/internal/config"
 	"github.com/spf13/cobra"
 )
@@ -24,10 +24,10 @@ func Execute() {
 }
 
 func warnNoRules(cfg *config.Config, path string) {
-	if len(cfg.Rules) == 0 {
-		color.Yellow("warning: no rules defined in %s — nothing to organize", path)
-		fmt.Printf("hint: create a config at %s (see rules.example.toml)\n", config.DefaultConfigPath())
-	}
+		if len(cfg.Rules) == 0 {
+			ansi.PrintYellow("warning: no rules defined in %s — nothing to organize\n", path)
+			fmt.Printf("hint: create a config at %s (see rules.example.toml)\n", config.DefaultConfigPath())
+		}
 }
 
 func init() {

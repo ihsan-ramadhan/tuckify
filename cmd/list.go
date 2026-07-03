@@ -45,8 +45,9 @@ var listCmd = &cobra.Command{
 
 		wFolder := 6 // min "FOLDER"
 		for _, s := range schedules {
-			if len(s.Folder)+2 > wFolder {
-				wFolder = len(s.Folder) + 2
+			fStr := strings.Join(s.GetFolders(), ", ")
+			if len(fStr)+2 > wFolder {
+				wFolder = len(fStr) + 2
 			}
 		}
 
@@ -59,7 +60,7 @@ var listCmd = &cobra.Command{
 		_, _ = colHeader.Printf(" %-*s│ %-*s│ %-*s│ %-*s│ %s\n",
 			wName-1, "NAME",
 			wStatus-1, "STATUS",
-			wSaved-1, "SAVED",
+			wSaved-1, "SERVICE",
 			wCron-1, "CRON",
 			"FOLDER")
 		fmt.Println(sep)
@@ -83,7 +84,7 @@ var listCmd = &cobra.Command{
 				col.Sprint(statusText), strings.Repeat(" ", wStatus-1-len(statusText)),
 				col.Sprint(savedText), strings.Repeat(" ", wSaved-1-len(savedText)),
 				wCron-1, s.Cron,
-				s.Folder)
+				strings.Join(s.GetFolders(), ", "))
 		}
 
 		if len(unsaved) > 0 {

@@ -13,6 +13,7 @@ var restartCmd = &cobra.Command{
 	Short: "Restart a schedule's system service",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		cmd.SilenceUsage = true
 		name := args[0]
 
 		found, err := store.Find(name)
@@ -38,7 +39,7 @@ var restartCmd = &cobra.Command{
 			}
 		}
 
-		if err := srv.Install(found.Name, found.Folder, found.Cron, found.Config); err != nil {
+		if err := srv.Install(found.Name, found.GetFolders(), found.Cron, found.Config); err != nil {
 			return fmt.Errorf("start service: %w", err)
 		}
 

@@ -3,11 +3,26 @@
 #
 # Rules are executed top to bottom.
 # Each file matches the first rule that fits — no multiple matches.
-# Extension matching is case-insensitive (.PDF == .pdf).
-# Filename patterns use glob syntax: * matches any characters.
-#   "*Modul*"   → any file containing "Modul"
-#   "Invoice_*" → any file starting with "Invoice_"
-#   "*_2024.*"  → any file ending with "_2024" before the extension
+#
+# Matching is case-insensitive:
+#   extensions (.PDF == .pdf)
+#   filename_patterns use glob syntax (* matches any characters)
+#   filename_regex use Go regex syntax (automatic (?i) prefix is applied)
+#
+# Match examples:
+#   extensions = [".pdf"]             → match by extension
+#   filename_patterns = ["*Modul*"]   → match file containing "Modul"
+#   filename_regex = ["^inv_\\d+$"]    → match file starting with inv_ followed by numbers (without extension)
+#   locations = ["~/Downloads"]        → only apply rule to files inside ~/Downloads
+#
+# Template Tokens (for destination and rename paths):
+#   {year}, {month}, {day}, {hour}, {minute}, {second}  → file modification time
+#   {base}      → original name without extension
+#   {ext}       → original extension (e.g. .pdf)
+#   Modifiers:
+#     {base:slug}   → slugified name (lowercase, alphanumeric + dashes)
+#     {base:lower}  → lowercase
+#     {base:upper}  → uppercase
 
 [settings]
 # strategy when a file with the same name already exists at the destination.
@@ -15,6 +30,7 @@
 # "skip"             → leave the file, do not move
 # "overwrite"        → replace the existing file
 # "delete_duplicate" → delete source if content hash matches destination, fallback to rename if different
+# "ask"              → prompt interactively: [O]verwrite, [S]kip, [R]ename
 conflict_strategy = "rename"
 
 # --- Documents ---
@@ -22,6 +38,7 @@ conflict_strategy = "rename"
 [[rule]]
 name        = "PDF"
 extensions  = [".pdf"]
+locations   = ["~/Downloads"]
 destination = "~/Documents/PDF"
 
 [[rule]]
@@ -39,6 +56,7 @@ destination = "~/Documents/Text"
 [[rule]]
 name        = "Photos"
 extensions  = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic"]
+locations   = ["~/Downloads", "~/Desktop"]
 destination = "~/Pictures/Sorted"
 
 [[rule]]
@@ -59,15 +77,24 @@ extensions  = [".mp3", ".wav", ".flac", ".aac", ".ogg"]
 destination = "~/Music"
 
 # --- Filename patterns ---
+#
+# Multiple matching methods can be combined.
+# Rules match from top to bottom. Here, structured invoices match the regex first,
+# and any remaining files starting with "invoice_" fall back to the next rule.
 
 [[rule]]
 name              = "Modul files"
-filename_patterns = ["*modul*", "*Modul*"]
+filename_patterns = ["*modul*"]
 destination       = "~/Documents/Modul"
 
 [[rule]]
-name              = "Invoices"
-filename_patterns = ["Invoice_*", "invoice_*"]
+name            = "Structured invoices (regex)"
+filename_regex  = ["^invoice_\\d{4}\\.pdf$"]
+destination     = "~/Documents/Invoices/Verified"
+
+[[rule]]
+name              = "General Invoices (glob)"
+filename_patterns = ["invoice_*"]
 destination       = "~/Documents/Invoices"
 
 # --- Downloads ---
@@ -82,7 +109,16 @@ name        = "Installers"
 extensions  = [".exe", ".dmg", ".deb", ".rpm", ".pkg", ".msi", ".appimage"]
 destination = "~/Downloads/Installers"
 
-# --- advanced features (size/age filters, copy/delete actions, renaming with modifiers) ---
+# --- advanced features (size/age filters, copy/delete actions, renaming) ---
+
+[[rule]]
+name        = "copy new receipts"
+extensions  = [".pdf"]
+filename_patterns = ["*receipt*"]
+destination = "~/Documents/Receipts"
+action      = "copy"
+max_age     = "7d"
+max_size    = "5MB"
 
 [[rule]]
 name        = "archive old reports"

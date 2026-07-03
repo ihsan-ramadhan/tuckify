@@ -1,6 +1,7 @@
 package organizer
 
 import (
+	"bufio"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -47,7 +49,7 @@ func matchMetadata(rule *config.Rule, info os.FileInfo) bool {
 }
 
 func matchName(rule *config.Rule, filename string) bool {
-	if len(rule.Extensions) == 0 && len(rule.FilenamePatterns) == 0 {
+	if len(rule.Extensions) == 0 && len(rule.FilenamePatterns) == 0 && len(rule.FilenameRegex) == 0 {
 		return true
 	}
 	ext := strings.ToLower(filepath.Ext(filename))
@@ -62,11 +64,34 @@ func matchName(rule *config.Rule, filename string) bool {
 			return true
 		}
 	}
+	for _, re := range rule.FilenameRegexCompiled() {
+		if re.MatchString(filename) {
+			return true
+		}
+	}
 	return false
 }
 
-func MatchRule(filename string, info os.FileInfo, rules []config.Rule) *config.Rule {
+// ruleAppliesToFolder reports whether rule's location restrictions (if any) allow folder.
+// A rule with no configured locations applies to every folder.
+func ruleAppliesToFolder(rule *config.Rule, folder string) bool {
+	locations := rule.LocationsExpanded()
+	if len(locations) == 0 {
+		return true
+	}
+	for _, loc := range locations {
+		if strings.HasPrefix(folder, loc) {
+			return true
+		}
+	}
+	return false
+}
+
+func MatchRule(filename string, info os.FileInfo, rules []config.Rule, folder string) *config.Rule {
 	for i := range rules {
+		if !ruleAppliesToFolder(&rules[i], folder) {
+			continue
+		}
 		if matchMetadata(&rules[i], info) && matchName(&rules[i], filename) {
 			return &rules[i]
 		}
@@ -74,24 +99,61 @@ func MatchRule(filename string, info os.FileInfo, rules []config.Rule) *config.R
 	return nil
 }
 
-func resolveDest(destDir, filename, strategy string) (string, error) {
-	dest := filepath.Join(destDir, filename)
+func askConflictStrategy(src, dest string) (string, error) {
+	reader := bufio.NewReader(os.Stdin)
+	for {
+		fmt.Printf("Conflict: %q already exists at %q\n", filepath.Base(src), dest)
+		fmt.Print("Choose: [O]verwrite, [S]kip, [R]ename: ")
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			return "", fmt.Errorf("read input: %w", err)
+		}
+		input = strings.TrimSpace(strings.ToLower(input))
+		switch input {
+		case "o", "overwrite":
+			return "overwrite", nil
+		case "s", "skip":
+			return "skip", nil
+		case "r", "rename":
+			return "rename", nil
+		default:
+			fmt.Println("Invalid choice. Please enter O, S, or R.")
+		}
+	}
+}
+
+func resolveDest(destDir, targetName, conflictStrategy string) (string, error) {
+	dest := filepath.Join(destDir, targetName)
 	if _, err := os.Stat(dest); os.IsNotExist(err) {
 		return dest, nil
 	}
-	switch strategy {
+
+	switch conflictStrategy {
 	case "skip":
 		return "", nil
 	case "overwrite":
 		return dest, nil
-	default:
-		ext := filepath.Ext(filename)
-		base := strings.TrimSuffix(filename, ext)
-		for i := 1; ; i++ {
-			candidate := filepath.Join(destDir, fmt.Sprintf("%s_%d%s", base, i, ext))
-			if _, err := os.Stat(candidate); os.IsNotExist(err) {
-				return candidate, nil
-			}
+	case "ask":
+		choice, err := askConflictStrategy(dest, dest)
+		if err != nil {
+			return "", err
+		}
+		if choice == "skip" {
+			return "", nil
+		}
+		if choice == "overwrite" {
+			return dest, nil
+		}
+	}
+
+	// rename strategy (default)
+	ext := filepath.Ext(targetName)
+	base := strings.TrimSuffix(targetName, ext)
+	for i := 1; ; i++ {
+		newName := fmt.Sprintf("%s_%d%s", base, i, ext)
+		newDest := filepath.Join(destDir, newName)
+		if _, err := os.Stat(newDest); os.IsNotExist(err) {
+			return newDest, nil
 		}
 	}
 }
@@ -112,11 +174,7 @@ func copyFile(src, dest string) (err error) {
 	if err != nil {
 		return err
 	}
-	defer func() {
-		if closeErr := out.Close(); err == nil {
-			err = closeErr
-		}
-	}()
+	defer func() { _ = out.Close() }()
 
 	if _, err := io.Copy(out, in); err != nil {
 		return err
@@ -323,16 +381,6 @@ func listFiles(folder string, recursive bool) ([]string, error) {
 	return files, err
 }
 
-func sortDirs(dirs []string) {
-	for i := 0; i < len(dirs); i++ {
-		for j := i + 1; j < len(dirs); j++ {
-			if len(dirs[i]) < len(dirs[j]) {
-				dirs[i], dirs[j] = dirs[j], dirs[i]
-			}
-		}
-	}
-}
-
 func deleteEmptyDirs(root string) error {
 	var dirs []string
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
@@ -348,7 +396,9 @@ func deleteEmptyDirs(root string) error {
 		return err
 	}
 
-	sortDirs(dirs)
+	sort.Slice(dirs, func(i, j int) bool {
+		return len(dirs[i]) > len(dirs[j])
+	})
 
 	for _, dir := range dirs {
 		entries, err := os.ReadDir(dir)
@@ -373,7 +423,8 @@ func organizeFile(src string, cfg *config.Config, dryRun bool) (Result, bool) {
 		}, true
 	}
 
-	rule := MatchRule(name, info, cfg.Rules)
+	folder := filepath.Dir(src)
+	rule := MatchRule(name, info, cfg.Rules, folder)
 	if rule == nil {
 		return Result{}, false
 	}
@@ -445,3 +496,7 @@ func Organize(folder string, cfg *config.Config, dryRun bool, recursive bool) ([
 
 	return results, nil
 }
+
+// HistoryWriter is set by cmd layer to persist undo history.
+// ponytail: func var so callers (cmd/run.go) can inject without import cycle.
+var HistoryWriter func(results []Result) error

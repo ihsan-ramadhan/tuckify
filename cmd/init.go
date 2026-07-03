@@ -28,7 +28,7 @@ var startupCmd = &cobra.Command{
 		}
 
 		for _, s := range schedules {
-			if err := srv.Install(s.Name, s.Folder, s.Cron, s.Config); err != nil {
+			if err := srv.Install(s.Name, s.GetFolders(), s.Cron, s.Config); err != nil {
 				fmt.Printf("failed to install %q: %v\n", s.Name, err)
 				continue
 			}
