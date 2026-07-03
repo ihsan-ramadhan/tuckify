@@ -1,0 +1,16 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "tuckify-gui",
+  "outputfilename": "tuckify-gui",
+  "maindir": "./gui",
+  "wailsjsdir": "./gui/frontend/src",
+  "assetdir": "./gui/frontend/dist",
+  "frontend:install": "npm --prefix gui/frontend install",
+  "frontend:build": "npm --prefix gui/frontend run build",
+  "frontend:dev:watcher": "npm --prefix gui/frontend run dev",
+  "frontend:dev:serverUrl": "auto",
+  "author": {
+    "name": "Muhammad Ihsan Ramadhan",
+    "email": "ihsanhandsome06@gmail.com"
+  }
+}

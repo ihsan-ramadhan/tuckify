@@ -1,2 +1,14 @@
 tuckify
 dist/
+
+# Agent-specific tracking files (local reference only)
+AGENTS.md
+CLAUDE.md
+CLI_REFACTOR.md
+PRD.md
+PROMPT.md
+.analysis-summary.md
+
+# Go workspace artifacts
+go.work
+go.work.sum
