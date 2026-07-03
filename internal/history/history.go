@@ -131,6 +131,32 @@ func LoadAll() ([]Run, error) {
 	return runs, nil
 }
 
+// findRun locates a run by ID. If id is 0, returns the latest run.
+func findRun(runs []Run, id int) *Run {
+	if id == 0 && len(runs) > 0 {
+		return &runs[len(runs)-1]
+	}
+	for i := range runs {
+		if runs[i].ID == id {
+			return &runs[i]
+		}
+	}
+	return nil
+}
+
+// revertEntry attempts to reverse a single move entry. Returns true if reverted.
+func revertEntry(e Entry) bool {
+	if err := os.MkdirAll(filepath.Dir(e.Src), 0o755); err != nil {
+		fmt.Printf("skipped %q: %v\n", e.Dest, err)
+		return false
+	}
+	if err := os.Rename(e.Dest, e.Src); err != nil {
+		fmt.Printf("skipped %q: %v\n", e.Dest, err)
+		return false
+	}
+	return true
+}
+
 // Undo reverses a specific run by ID. If ID is 0, reverses the latest run.
 // Returns count of reverted files.
 func Undo(id int) (int, error) {
@@ -142,19 +168,7 @@ func Undo(id int) (int, error) {
 		return 0, nil
 	}
 
-	var target *Run
-	if id == 0 {
-		// Latest run is the last element
-		target = &runs[len(runs)-1]
-	} else {
-		for i := range runs {
-			if runs[i].ID == id {
-				target = &runs[i]
-				break
-			}
-		}
-	}
-
+	target := findRun(runs, id)
 	if target == nil {
 		return 0, fmt.Errorf("run with ID %d not found", id)
 	}
@@ -170,15 +184,9 @@ func Undo(id int) (int, error) {
 			fmt.Printf("skipped: cannot undo delete of %q\n", e.Src)
 			continue
 		default: // "move" or ""
-			if err := os.MkdirAll(filepath.Dir(e.Src), 0o755); err != nil {
-				fmt.Printf("skipped %q: %v\n", e.Dest, err)
-				continue
+			if revertEntry(e) {
+				count++
 			}
-			if err := os.Rename(e.Dest, e.Src); err != nil {
-				fmt.Printf("skipped %q: %v\n", e.Dest, err)
-				continue
-			}
-			count++
 		}
 	}
 
