@@ -1,19 +1,35 @@
-# README
+# tuckify-gui
 
-## About
+Desktop GUI for tuckify, built with Wails v2.
 
-This is the official Wails Vanilla template.
+## Requirements
 
-You can configure the project by editing `wails.json`. More information about the project settings can be found
-here: https://wails.io/docs/reference/project-config
+- Go 1.22+
+- Node.js 18+ (for the Vite frontend)
+- Linux: `webkit2gtk-4.1` (not 4.0 — most modern distros ship 4.1 only)
+  - Arch/CachyOS: `pacman -S webkit2gtk-4.1`
+  - Debian/Ubuntu: `apt install libwebkit2gtk-4.1-dev`
 
-## Live Development
+## Build tags
 
-To run in live development mode, run `wails dev` in the project directory. This will run a Vite development
-server that will provide very fast hot reload of your frontend changes. If you want to develop in a browser
-and have access to your Go methods, there is also a dev server that runs on http://localhost:34115. Connect
-to this in your browser, and you can call your Go code from devtools.
+Since this system only has `webkit2gtk-4.1` (the older `4.0` is deprecated on most
+distros), always pass `-tags webkit2_41` to wails commands:
 
-## Building
+```bash
+wails dev -tags webkit2_41
+wails build -tags webkit2_41
+```
 
-To build a redistributable, production mode package, use `wails build`.
+## Development
+
+```bash
+wails dev -tags webkit2_41
+```
+
+## Build
+
+```bash
+wails build -tags webkit2_41
+```
+
+Output binary lands in `gui/build/bin/`.
