@@ -88,9 +88,9 @@ func (a *App) GetSchedules() ([]scheduleView, error) {
 	views := make([]scheduleView, 0, len(schedules))
 	for _, s := range schedules {
 		online, _ := srv.Exists(s.Name)
-		status := "offline"
+		status := "inactive"
 		if online {
-			status = "online"
+			status = "active"
 		}
 		folders := s.GetFolders()
 
