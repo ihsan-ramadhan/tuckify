@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  build-cli:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -18,7 +18,7 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Build binaries
+      - name: Build CLI binaries
         run: |
           mkdir -p dist
           # Linux amd64
@@ -32,15 +32,109 @@ jobs:
           # Windows amd64
           GOOS=windows GOARCH=amd64 go build -o dist/tuckify-windows-amd64.exe .
 
+      - name: Upload CLI artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-binaries
+          path: dist/*
+
+  build-gui:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux/amd64
+            artifact: gui/build/bin/tuckify-gui
+            release_name: tuckify-gui-linux-amd64
+          - os: macos-latest
+            platform: darwin/universal
+            artifact: gui/build/bin/tuckify-gui.app
+            release_name: tuckify-gui-mac-universal.app
+          - os: windows-latest
+            platform: windows/amd64
+            artifact: gui/build/bin/tuckify-gui.exe
+            release_name: tuckify-gui-windows-amd64.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Linux Dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+
+      - name: Build Wails App
+        uses: wailsapp/wails-gh-action@v2
+        with:
+          build-name: tuckify-gui
+          build-platform: ${{ matrix.platform }}
+          go-version: '1.22'
+          wails-version: 'v2.12.0'
+          package: true
+          # we pass -tags webkit2_41 to build on linux, and fallback on others
+          wails-build-args: "-tags webkit2_41"
+
+      # macOS packages .app as folder, we need to zip it for release
+      - name: Compress macOS App
+        if: matrix.os == 'macos-latest'
+        run: |
+          cd gui/build/bin
+          zip -r ../../../tuckify-gui-mac-universal.zip tuckify-gui.app
+
+      - name: Rename Linux / Windows Artifacts
+        if: matrix.os != 'macos-latest'
+        run: |
+          mkdir -p dist-gui
+          cp ${{ matrix.artifact }} dist-gui/${{ matrix.release_name }}
+
+      - name: Prepare macOS Artifact for Upload
+        if: matrix.os == 'macos-latest'
+        run: |
+          mkdir -p dist-gui
+          cp tuckify-gui-mac-universal.zip dist-gui/
+
+      - name: Upload GUI Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: gui-binaries-${{ matrix.release_name || 'mac-universal' }}
+          path: dist-gui/*
+
+  create-release:
+    needs: [build-cli, build-gui]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download CLI Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: cli-binaries
+          path: dist
+
+      - name: Download GUI Artifacts (Linux)
+        uses: actions/download-artifact@v4
+        with:
+          name: gui-binaries-tuckify-gui-linux-amd64
+          path: dist
+
+      - name: Download GUI Artifacts (Windows)
+        uses: actions/download-artifact@v4
+        with:
+          name: gui-binaries-tuckify-gui-windows-amd64.exe
+          path: dist
+
+      - name: Download GUI Artifacts (macOS)
+        uses: actions/download-artifact@v4
+        with:
+          name: gui-binaries-mac-universal
+          path: dist
+
       - name: Create Release
         uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
         with:
           generate_release_notes: true
           files: |
-            dist/tuckify-linux-amd64
-            dist/tuckify-linux-arm64
-            dist/tuckify-darwin-amd64
-            dist/tuckify-darwin-arm64
-            dist/tuckify-windows-amd64.exe
+            dist/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
