@@ -12,3 +12,7 @@ PROMPT.md
 # Go workspace artifacts
 go.work
 go.work.sum
+
+# Wails build artifacts
+build/
+
