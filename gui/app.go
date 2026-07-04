@@ -60,18 +60,45 @@ func (a *App) SaveRules(content string) error {
 }
 
 func (a *App) ValidateRules(content string) (string, error) {
-	// write to temp file to validate
-	tmp := filepath.Join(os.TempDir(), "tuckify-validate.toml")
-	if err := os.WriteFile(tmp, []byte(content), 0644); err != nil {
+	// write to secure temp file to validate
+	tmpFile, err := os.CreateTemp("", "tuckify-validate-*.toml")
+	if err != nil {
 		return "", err
 	}
+	tmp := tmpFile.Name()
 	defer func() { _ = os.Remove(tmp) }()
 
-	_, err := config.Load(tmp)
+	if _, err := tmpFile.Write([]byte(content)); err != nil {
+		_ = tmpFile.Close()
+		return "", err
+	}
+	_ = tmpFile.Close()
+
+	_, err = config.Load(tmp)
 	if err != nil {
 		return err.Error(), nil
 	}
 	return "", nil
+}
+
+func findLastRunInfo(runs []history.Run, folders []string) (time.Time, int) {
+	for i := len(runs) - 1; i >= 0; i-- {
+		r := runs[i]
+		for _, sf := range folders {
+			for _, rf := range r.Folders {
+				if sf == rf {
+					lastFiles := 0
+					for _, e := range r.Entries {
+						if e.Action == "move" || e.Action == "" {
+							lastFiles++
+						}
+					}
+					return r.Timestamp, lastFiles
+				}
+			}
+		}
+	}
+	return time.Time{}, 0
 }
 
 func (a *App) GetSchedules() ([]scheduleView, error) {
@@ -93,34 +120,7 @@ func (a *App) GetSchedules() ([]scheduleView, error) {
 			status = "active"
 		}
 		folders := s.GetFolders()
-
-		// match schedule against history runs
-		var lastRun time.Time
-		lastFiles := 0
-		found := false
-		for i := len(runs) - 1; i >= 0; i-- {
-			if found {
-				break
-			}
-			r := runs[i]
-			for _, sf := range folders {
-				for _, rf := range r.Folders {
-					if sf == rf {
-						lastRun = r.Timestamp
-						for _, e := range r.Entries {
-							if e.Action == "move" || e.Action == "" {
-								lastFiles++
-							}
-						}
-						found = true
-						break
-					}
-				}
-				if found {
-					break
-				}
-			}
-		}
+		lastRun, lastFiles := findLastRunInfo(runs, folders)
 
 		views = append(views, scheduleView{
 			Name:      s.Name,
