@@ -16,3 +16,6 @@ go.work.sum
 # Wails build artifacts
 build/
 
+# Wails generated bindings (auto-generated, do not commit)
+gui/frontend/wailsjs/
+

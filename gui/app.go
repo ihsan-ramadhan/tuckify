@@ -15,7 +15,7 @@ import (
 )
 
 type App struct {
-	ctx context.Context
+	ctx context.Context // NOSONAR: wails lifecycle requires ctx field
 }
 
 func NewApp() *App {
@@ -81,21 +81,32 @@ func (a *App) ValidateRules(content string) (string, error) {
 	return "", nil
 }
 
+func runMatchesFolders(r history.Run, folders []string) bool {
+	for _, sf := range folders {
+		for _, rf := range r.Folders {
+			if sf == rf {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func countMovedEntries(entries []history.Entry) int {
+	count := 0
+	for _, e := range entries {
+		if e.Action == "move" || e.Action == "" {
+			count++
+		}
+	}
+	return count
+}
+
 func findLastRunInfo(runs []history.Run, folders []string) (time.Time, int) {
 	for i := len(runs) - 1; i >= 0; i-- {
 		r := runs[i]
-		for _, sf := range folders {
-			for _, rf := range r.Folders {
-				if sf == rf {
-					lastFiles := 0
-					for _, e := range r.Entries {
-						if e.Action == "move" || e.Action == "" {
-							lastFiles++
-						}
-					}
-					return r.Timestamp, lastFiles
-				}
-			}
+		if runMatchesFolders(r, folders) {
+			return r.Timestamp, countMovedEntries(r.Entries)
 		}
 	}
 	return time.Time{}, 0

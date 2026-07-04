@@ -57,7 +57,7 @@ tabBtns.forEach(btn => {
 
 // modal close
 closeModalBtn.addEventListener('click', () => resultsModal.classList.add('hidden'));
-window.addEventListener('click', (e) => {
+globalThis.addEventListener('click', (e) => {
 	if (e.target === resultsModal) resultsModal.classList.add('hidden');
 });
 
@@ -354,7 +354,7 @@ async function loadHistory() {
 }
 
 async function handleUndo(e) {
-	const id = parseInt(e.target.dataset.id, 10);
+	const id = Number.parseInt(e.target.dataset.id, 10);
 	if (confirm(`Are you sure you want to undo run #${id}? This will revert moved files.`)) {
 		try {
 			e.target.disabled = true;
