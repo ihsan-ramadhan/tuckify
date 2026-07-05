@@ -344,10 +344,44 @@ body {
 	border: 1px solid var(--border-standard);
 	border-radius: 8px;
 	padding: 20px;
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+}
+
+.rule-main-row {
 	display: grid;
 	grid-template-columns: 1.5fr 1fr 2fr auto;
 	gap: 16px;
 	align-items: center;
+	width: 100%;
+}
+
+.rule-advanced-toggle {
+	font-size: 11px;
+	color: var(--text-tertiary);
+	cursor: pointer;
+	text-decoration: underline;
+	align-self: flex-start;
+	background: none;
+	border: none;
+	padding: 0;
+}
+
+.rule-advanced-toggle:hover {
+	color: var(--text-primary);
+}
+
+.rule-advanced-panel {
+	border-top: 1px dashed var(--border-subtle);
+	padding-top: 16px;
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 16px;
+}
+
+.rule-advanced-panel.hidden {
+	display: none;
 }
 
 .rule-field {

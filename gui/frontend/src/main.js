@@ -91,7 +91,12 @@ browseSchedFolder.addEventListener('click', async () => {
 	try {
 		const path = await SelectDirectory('Select target folder for schedule');
 		if (path) {
-			schedFolder.value = path;
+			const currentVal = schedFolder.value.trim();
+			if (currentVal) {
+				schedFolder.value = `${currentVal}, ${path}`;
+			} else {
+				schedFolder.value = path;
+			}
 		}
 	} catch (err) {
 		alert(`Error selecting directory: ${err}`);
@@ -102,7 +107,12 @@ browseRunFolder.addEventListener('click', async () => {
 	try {
 		const path = await SelectDirectory('Select folder to organize');
 		if (path) {
-			runFolder.value = path;
+			const currentVal = runFolder.value.trim();
+			if (currentVal) {
+				runFolder.value = `${currentVal}, ${path}`;
+			} else {
+				runFolder.value = path;
+			}
 		}
 	} catch (err) {
 		alert(`Error selecting directory: ${err}`);
@@ -214,7 +224,9 @@ cancelSchedBtn.addEventListener('click', () => schedModal.classList.remove('acti
 schedForm.addEventListener('submit', async (e) => {
 	e.preventDefault();
 	const name = schedName.value.trim();
-	const folder = schedFolder.value.trim();
+	const folderVal = schedFolder.value.trim();
+	const folders = folderVal.split(',').map(s => s.trim()).filter(s => s !== '');
+	
 	let cron = schedCron.value;
 	if (cron === 'custom') {
 		cron = schedCustomCron.value.trim();
@@ -222,7 +234,7 @@ schedForm.addEventListener('submit', async (e) => {
 	const configPath = schedConfig.value.trim();
 
 	try {
-		await SaveSchedule(name, [folder], cron, configPath);
+		await SaveSchedule(name, folders, cron, configPath);
 		schedModal.classList.remove('active');
 		loadSchedules();
 	} catch (err) {
@@ -272,7 +284,7 @@ async function handleEdit(e) {
 			schedFormTitle.textContent = 'Edit Schedule';
 			schedOrigName.value = s.Name;
 			schedName.value = s.Name;
-			schedFolder.value = s.Folders[0] || '';
+			schedFolder.value = (s.Folders || []).join(', ');
 			schedConfig.value = s.Config || '';
 			
 			if (['0 * * * *', '0 0 * * *', '0 0 * * 0'].includes(s.Cron)) {
@@ -307,9 +319,15 @@ runOrganizeBtn.addEventListener('click', () => triggerRun(false));
 runDryBtn.addEventListener('click', () => triggerRun(true));
 
 async function triggerRun(dryRun) {
-	const folder = runFolder.value.trim();
-	if (!folder) {
+	const folderVal = runFolder.value.trim();
+	if (!folderVal) {
 		alert('Silakan pilih folder target terlebih dahulu!');
+		return;
+	}
+
+	const folders = folderVal.split(',').map(s => s.trim()).filter(s => s !== '');
+	if (folders.length === 0) {
+		alert('Silakan masukkan folder target yang valid!');
 		return;
 	}
 
@@ -319,10 +337,10 @@ async function triggerRun(dryRun) {
 	btn.textContent = 'Processing...';
 
 	try {
-		const res = await RunOrganize([folder], dryRun);
-		showResultsModal(res);
+		const results = await RunOrganize(folders, dryRun);
+		showResultsModal(results);
 	} catch (err) {
-		alert(`Error running organize: ${err}`);
+		alert(`Error running organizer: ${err}`);
 	} finally {
 		btn.disabled = false;
 		btn.textContent = origText;
@@ -382,29 +400,63 @@ function renderRules() {
 			<span class="tag-pill">${ext} <span class="tag-close" data-idx="${idx}" data-val="${ext}">&times;</span></span>
 		`).join('');
 
+		const showAdv = rule._showAdvanced ? '' : 'hidden';
+		const toggleText = rule._showAdvanced ? 'Hide Advanced Options' : 'Show Advanced Options';
+
 		rcard.innerHTML = `
-			<div class="rule-field">
-				<span class="rule-field-label">File Extensions</span>
-				<div class="tags-container">
-					${tagPills}
-					<input type="text" class="tag-input" placeholder="+ add ext..." data-idx="${idx}">
+			<div class="rule-main-row">
+				<div class="rule-field">
+					<span class="rule-field-label">File Extensions</span>
+					<div class="tags-container">
+						${tagPills}
+						<input type="text" class="tag-input" placeholder="+ add ext..." data-idx="${idx}">
+					</div>
+				</div>
+				<div class="rule-field">
+					<span class="rule-field-label">Action</span>
+					<select class="form-control action-select" data-idx="${idx}">
+						<option value="move" ${rule.action === 'move' ? 'selected' : ''}>Move File</option>
+						<option value="delete" ${rule.action === 'delete' ? 'selected' : ''}>Delete File</option>
+					</select>
+				</div>
+				<div class="rule-field">
+					<span class="rule-field-label">Destination Folder</span>
+					<div class="picker-wrapper">
+						<input type="text" class="form-control dest-input" value="${rule.destination || ''}" readonly>
+						<button type="button" class="btn btn-secondary browse-dest-btn" data-idx="${idx}">📁 Browse</button>
+					</div>
+				</div>
+				<button type="button" class="btn btn-danger remove-rule-btn" data-idx="${idx}" style="padding: 10px;">&times;</button>
+			</div>
+			
+			<button type="button" class="rule-advanced-toggle" data-idx="${idx}">${toggleText}</button>
+			
+			<div class="rule-advanced-panel ${showAdv}">
+				<div class="rule-field">
+					<span class="rule-field-label">Filename Patterns (Glob, e.g. *Invoice*, *Report*)</span>
+					<input type="text" class="form-control pattern-input" data-idx="${idx}" value="${(rule.filename_patterns || []).join(', ')}" placeholder="e.g. *Invoice*, *Report*">
+				</div>
+				<div class="rule-field">
+					<span class="rule-field-label">Filename Regex (Regex, e.g. ^[0-9]{4}-)</span>
+					<input type="text" class="form-control regex-input" data-idx="${idx}" value="${(rule.filename_regex || []).join(', ')}" placeholder="e.g. ^[0-9]{4}-">
+				</div>
+				<div class="rule-field">
+					<span class="rule-field-label">Min Size (e.g. 10KB, 5MB)</span>
+					<input type="text" class="form-control minsize-input" data-idx="${idx}" value="${rule.min_size || ''}" placeholder="e.g. 10KB">
+				</div>
+				<div class="rule-field">
+					<span class="rule-field-label">Max Size (e.g. 50MB, 1GB)</span>
+					<input type="text" class="form-control maxsize-input" data-idx="${idx}" value="${rule.max_size || ''}" placeholder="e.g. 50MB">
+				</div>
+				<div class="rule-field">
+					<span class="rule-field-label">Min Age (e.g. 24h, 7d)</span>
+					<input type="text" class="form-control minage-input" data-idx="${idx}" value="${rule.min_age || ''}" placeholder="e.g. 24h">
+				</div>
+				<div class="rule-field">
+					<span class="rule-field-label">Max Age (e.g. 30d, 365d)</span>
+					<input type="text" class="form-control maxage-input" data-idx="${idx}" value="${rule.max_age || ''}" placeholder="e.g. 30d">
 				</div>
 			</div>
-			<div class="rule-field">
-				<span class="rule-field-label">Action</span>
-				<select class="form-control action-select" data-idx="${idx}">
-					<option value="move" ${rule.action === 'move' ? 'selected' : ''}>Move File</option>
-					<option value="delete" ${rule.action === 'delete' ? 'selected' : ''}>Delete File</option>
-				</select>
-			</div>
-			<div class="rule-field">
-				<span class="rule-field-label">Destination Folder</span>
-				<div class="picker-wrapper">
-					<input type="text" class="form-control dest-input" value="${rule.destination || ''}" readonly>
-					<button type="button" class="btn btn-secondary browse-dest-btn" data-idx="${idx}">📁 Browse</button>
-				</div>
-			</div>
-			<button type="button" class="btn btn-danger remove-rule-btn" data-idx="${idx}" style="padding: 10px;">&times;</button>
 		`;
 
 		rulesList.appendChild(rcard);
@@ -425,6 +477,27 @@ function renderRules() {
 	});
 	document.querySelectorAll('.remove-rule-btn').forEach(btn => {
 		btn.addEventListener('click', handleRemoveRule);
+	});
+	document.querySelectorAll('.rule-advanced-toggle').forEach(btn => {
+		btn.addEventListener('click', handleToggleAdvanced);
+	});
+	document.querySelectorAll('.pattern-input').forEach(input => {
+		input.addEventListener('input', handlePatternChange);
+	});
+	document.querySelectorAll('.regex-input').forEach(input => {
+		input.addEventListener('input', handleRegexChange);
+	});
+	document.querySelectorAll('.minsize-input').forEach(input => {
+		input.addEventListener('input', e => { activeRules[Number(e.target.dataset.idx)].min_size = e.target.value.trim(); });
+	});
+	document.querySelectorAll('.maxsize-input').forEach(input => {
+		input.addEventListener('input', e => { activeRules[Number(e.target.dataset.idx)].max_size = e.target.value.trim(); });
+	});
+	document.querySelectorAll('.minage-input').forEach(input => {
+		input.addEventListener('input', e => { activeRules[Number(e.target.dataset.idx)].min_age = e.target.value.trim(); });
+	});
+	document.querySelectorAll('.maxage-input').forEach(input => {
+		input.addEventListener('input', e => { activeRules[Number(e.target.dataset.idx)].max_age = e.target.value.trim(); });
 	});
 }
 
@@ -475,6 +548,24 @@ function handleRemoveRule(e) {
 	const idx = Number(e.target.dataset.idx);
 	activeRules.splice(idx, 1);
 	renderRules();
+}
+
+function handleToggleAdvanced(e) {
+	const idx = Number(e.target.dataset.idx);
+	activeRules[idx]._showAdvanced = !activeRules[idx]._showAdvanced;
+	renderRules();
+}
+
+function handlePatternChange(e) {
+	const idx = Number(e.target.dataset.idx);
+	const val = e.target.value;
+	activeRules[idx].filename_patterns = val.split(',').map(s => s.trim()).filter(s => s !== '');
+}
+
+function handleRegexChange(e) {
+	const idx = Number(e.target.dataset.idx);
+	const val = e.target.value;
+	activeRules[idx].filename_regex = val.split(',').map(s => s.trim()).filter(s => s !== '');
 }
 
 addRuleBtn.addEventListener('click', () => {
