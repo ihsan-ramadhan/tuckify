@@ -3,12 +3,14 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 
+	"github.com/BurntSushi/toml"
 	"github.com/ihsan-ramadhan/tuckify/internal/config"
 	"github.com/ihsan-ramadhan/tuckify/internal/history"
 	"github.com/ihsan-ramadhan/tuckify/internal/organizer"
@@ -33,6 +35,70 @@ func (a *App) SelectDirectory(title string) (string, error) {
 	return runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
 		Title: title,
 	})
+}
+
+type RuleView struct {
+	Extensions       []string `json:"extensions"`
+	FilenamePatterns []string `json:"filename_patterns"`
+	Destination      string   `json:"destination"`
+	Action           string   `json:"action"`
+}
+
+func (a *App) GetVisualRules() ([]RuleView, error) {
+	p := a.GetRulesPath()
+	cfg, err := config.Load(p)
+	if os.IsNotExist(err) {
+		return []RuleView{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	views := make([]RuleView, 0, len(cfg.Rules))
+	for _, r := range cfg.Rules {
+		action := r.Action
+		if action == "" {
+			action = "move"
+		}
+		views = append(views, RuleView{
+			Extensions:       r.Extensions,
+			FilenamePatterns: r.FilenamePatterns,
+			Destination:      r.Destination,
+			Action:           action,
+		})
+	}
+	return views, nil
+}
+
+func (a *App) SaveVisualRules(rules []RuleView) error {
+	p := a.GetRulesPath()
+	if err := os.MkdirAll(filepath.Dir(p), 0755); err != nil {
+		return err
+	}
+
+	var cfg config.Config
+	_, err := toml.DecodeFile(p, &cfg)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	cfg.Rules = make([]config.Rule, 0, len(rules))
+	for _, r := range rules {
+		cfg.Rules = append(cfg.Rules, config.Rule{
+			Extensions:       r.Extensions,
+			FilenamePatterns: r.FilenamePatterns,
+			Destination:      r.Destination,
+			Action:           r.Action,
+		})
+	}
+
+	var buf bytes.Buffer
+	enc := toml.NewEncoder(&buf)
+	if err := enc.Encode(cfg); err != nil {
+		return err
+	}
+
+	return os.WriteFile(p, buf.Bytes(), 0644)
 }
 
 type scheduleView struct {
