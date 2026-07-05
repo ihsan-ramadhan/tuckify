@@ -105,6 +105,14 @@
                 </div>
                 
                 <div class="card">
+                    <div class="form-group" style="max-width: 350px; margin-bottom: 24px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 16px;">
+                        <label for="conflict-strategy">Duplicate Conflict Strategy</label>
+                        <select id="conflict-strategy" class="form-control">
+                            <option value="rename">Auto Rename (Add suffix _1, _2)</option>
+                            <option value="delete_duplicate">Delete Duplicate</option>
+                        </select>
+                    </div>
+
                     <div id="rules-list" class="rules-list">
                         <!-- Rule cards loaded dynamically -->
                     </div>
@@ -167,6 +175,19 @@
                         </tbody>
                     </table>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Logs Modal -->
+    <div id="logs-modal" class="modal">
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header">
+                <h3 id="logs-title">Schedule Logs</h3>
+                <button id="close-logs-modal" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <pre id="logs-content" style="background: var(--bg-primary); padding: 15px; border-radius: 6px; font-family: monospace; font-size: 13px; color: var(--text-secondary); max-height: 400px; overflow-y: auto; white-space: pre-wrap; border: 1px solid var(--border-subtle);"></pre>
             </div>
         </div>
     </div>

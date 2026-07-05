@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"time"
 
@@ -331,4 +332,67 @@ func (a *App) GetHistory() ([]history.Run, error) {
 
 func (a *App) UndoRun(id int) (int, error) {
 	return history.Undo(id)
+}
+
+func (a *App) GetLogs(name string, lines int) (string, error) {
+	srv, err := service.NewService()
+	if err != nil {
+		return "", err
+	}
+
+	if _, errSys := exec.LookPath("systemctl"); errSys == nil {
+		jctl, errJ := exec.LookPath("journalctl")
+		if errJ != nil {
+			return "", fmt.Errorf("journalctl not found: %w", errJ)
+		}
+		args := []string{"--user", "-u", "tuckify-" + name, "-n", fmt.Sprintf("%d", lines), "--no-pager", "-o", "short-monotonic"}
+		cmd := exec.Command(jctl, args...)
+		var out bytes.Buffer
+		cmd.Stdout = &out
+		cmd.Stderr = &out
+		_ = cmd.Run()
+		return out.String(), nil
+	}
+
+	status, err := srv.CheckStatus()
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("Logs not directly fetchable on this platform.\n%s\n", status), nil
+}
+
+func (a *App) GetConflictStrategy() (string, error) {
+	p := a.GetRulesPath()
+	var cfg config.Config
+	_, err := toml.DecodeFile(p, &cfg)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "rename", nil
+		}
+		return "", err
+	}
+	strategy := cfg.Settings.ConflictStrategy
+	if strategy == "" {
+		strategy = "rename"
+	}
+	return strategy, nil
+}
+
+func (a *App) SaveConflictStrategy(strategy string) error {
+	p := a.GetRulesPath()
+	var cfg config.Config
+	_, err := toml.DecodeFile(p, &cfg)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	cfg.Settings.ConflictStrategy = strategy
+
+	var buf bytes.Buffer
+	enc := toml.NewEncoder(&buf)
+	if err := enc.Encode(cfg); err != nil {
+		return err
+	}
+
+	return os.WriteFile(p, buf.Bytes(), 0644)
 }

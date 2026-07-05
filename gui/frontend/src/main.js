@@ -6,7 +6,8 @@ import {
 	GetVisualRules, SaveVisualRules,
 	RunOrganize,
 	GetHistory, UndoRun,
-	SelectDirectory
+	SelectDirectory, GetLogs,
+	GetConflictStrategy, SaveConflictStrategy
 } from '../wailsjs/go/main/App';
 
 // state management
@@ -46,12 +47,19 @@ const addRuleBtn = document.getElementById('add-rule-btn');
 const saveRulesBtn = document.getElementById('save-rules-btn');
 const resetRulesBtn = document.getElementById('reset-rules-btn');
 const validationAlert = document.getElementById('validation-alert');
+const conflictStrategySelect = document.getElementById('conflict-strategy');
 
 // History
 const historyRows = document.getElementById('history-rows');
 const resultsModal = document.getElementById('results-modal');
 const closeModalBtn = document.getElementById('close-modal-btn');
 const modalResultsRows = document.getElementById('modal-results-rows');
+
+// Logs Modal
+const logsModal = document.getElementById('logs-modal');
+const closeLogsModal = document.getElementById('close-logs-modal');
+const logsTitle = document.getElementById('logs-title');
+const logsContent = document.getElementById('logs-content');
 
 // tab switcher
 tabs.forEach(btn => {
@@ -72,8 +80,10 @@ tabs.forEach(btn => {
 
 // modal close
 closeModalBtn.addEventListener('click', () => resultsModal.classList.remove('active'));
+closeLogsModal.addEventListener('click', () => logsModal.classList.remove('active'));
 globalThis.addEventListener('click', (e) => {
 	if (e.target === resultsModal) resultsModal.classList.remove('active');
+	if (e.target === logsModal) logsModal.classList.remove('active');
 });
 
 // Folder Pickers (wails Go dialog binding)
@@ -169,6 +179,7 @@ async function loadSchedules() {
 							`<button class="btn btn-secondary stop-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.Name}">Stop</button>` :
 							`<button class="btn btn-primary start-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.Name}">Start</button>`
 						}
+						<button class="btn btn-secondary logs-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.Name}">Logs</button>
 						<button class="btn btn-secondary edit-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.Name}">Edit</button>
 						<button class="btn btn-danger delete-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.Name}">Delete</button>
 					</div>
@@ -179,6 +190,7 @@ async function loadSchedules() {
 
 		document.querySelectorAll('.stop-btn').forEach(b => b.addEventListener('click', handleStop));
 		document.querySelectorAll('.start-btn').forEach(b => b.addEventListener('click', handleStart));
+		document.querySelectorAll('.logs-btn').forEach(b => b.addEventListener('click', handleLogs));
 		document.querySelectorAll('.edit-btn').forEach(b => b.addEventListener('click', handleEdit));
 		document.querySelectorAll('.delete-btn').forEach(b => b.addEventListener('click', handleDelete));
 
@@ -235,6 +247,19 @@ async function handleStop(e) {
 		loadSchedules();
 	} catch (err) {
 		alert(`Error stopping: ${err}`);
+	}
+}
+
+async function handleLogs(e) {
+	const name = e.target.dataset.name;
+	logsTitle.textContent = `Logs for: ${name}`;
+	logsContent.textContent = 'Fetching logs...';
+	logsModal.classList.add('active');
+	try {
+		const data = await GetLogs(name, 100);
+		logsContent.textContent = data || 'No logs available.';
+	} catch (err) {
+		logsContent.textContent = `Error fetching logs: ${err}`;
 	}
 }
 
@@ -333,6 +358,8 @@ async function loadRulesBuilder() {
 	try {
 		rulesList.innerHTML = '<div class="loading">Loading rules...</div>';
 		activeRules = await GetVisualRules();
+		const strategy = await GetConflictStrategy();
+		conflictStrategySelect.value = strategy;
 		renderRules();
 	} catch (err) {
 		rulesList.innerHTML = `<div class="alert alert-danger">Error loading rules: ${err}</div>`;
@@ -477,6 +504,7 @@ saveRulesBtn.addEventListener('click', async () => {
 		}
 
 		await SaveVisualRules(activeRules);
+		await SaveConflictStrategy(conflictStrategySelect.value);
 		validationAlert.className = 'alert alert-success';
 		validationAlert.textContent = 'Rules saved successfully!';
 		validationAlert.classList.remove('hidden');
