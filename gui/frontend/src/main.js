@@ -3,165 +3,215 @@ import './app.css';
 
 import {
 	GetSchedules, SaveSchedule, StartSchedule, StopSchedule, DeleteSchedule,
-	GetRules, SaveRules, ValidateRules,
+	GetVisualRules, SaveVisualRules,
 	RunOrganize,
-	GetHistory, UndoRun
+	GetHistory, UndoRun,
+	SelectDirectory
 } from '../wailsjs/go/main/App';
 
 // state management
 let currentTab = 'dashboard';
+let activeRules = []; // stores visual rules list
 
 // DOM elements
-const tabBtns = document.querySelectorAll('.tab-btn');
-const tabContents = document.querySelectorAll('.tab-content');
+const tabs = document.querySelectorAll('.tab');
+const tabPanels = document.querySelectorAll('.tab-panel');
 
+// Dashboard/Schedules
 const schedulesList = document.getElementById('schedules-list');
 const addSchedBtn = document.getElementById('add-sched-btn');
+const schedModal = document.getElementById('sched-modal');
+const closeSchedModal = document.getElementById('close-sched-modal');
 const cancelSchedBtn = document.getElementById('cancel-sched-btn');
-const schedFormCard = document.getElementById('sched-form-card');
 const schedForm = document.getElementById('sched-form');
 const schedFormTitle = document.getElementById('sched-form-title');
 const schedOrigName = document.getElementById('sched-orig-name');
 const schedName = document.getElementById('sched-name');
-const schedFolders = document.getElementById('sched-folders');
+const schedFolder = document.getElementById('sched-folder');
+const browseSchedFolder = document.getElementById('browse-sched-folder');
 const schedCron = document.getElementById('sched-cron');
+const customCronGroup = document.getElementById('custom-cron-group');
+const schedCustomCron = document.getElementById('sched-custom-cron');
 const schedConfig = document.getElementById('sched-config');
 
-const rulesTextarea = document.getElementById('rules-textarea');
-const validateRulesBtn = document.getElementById('validate-rules-btn');
+// Run Manual
+const runFolder = document.getElementById('run-folder');
+const browseRunFolder = document.getElementById('browse-run-folder');
+const runOrganizeBtn = document.getElementById('run-organize-btn');
+const runDryBtn = document.getElementById('run-dry-btn');
+
+// Rules Builder
+const rulesList = document.getElementById('rules-list');
+const addRuleBtn = document.getElementById('add-rule-btn');
 const saveRulesBtn = document.getElementById('save-rules-btn');
+const resetRulesBtn = document.getElementById('reset-rules-btn');
 const validationAlert = document.getElementById('validation-alert');
 
+// History
 const historyRows = document.getElementById('history-rows');
-
 const resultsModal = document.getElementById('results-modal');
 const closeModalBtn = document.getElementById('close-modal-btn');
 const modalResultsRows = document.getElementById('modal-results-rows');
 
 // tab switcher
-tabBtns.forEach(btn => {
+tabs.forEach(btn => {
 	btn.addEventListener('click', () => {
 		const target = btn.dataset.tab;
-		tabBtns.forEach(b => b.classList.remove('active'));
-		tabContents.forEach(c => c.classList.remove('active'));
+		tabs.forEach(b => b.classList.remove('active'));
+		tabPanels.forEach(c => c.classList.remove('active'));
 
 		btn.classList.add('active');
 		document.getElementById(target).classList.add('active');
 		currentTab = target;
 
 		if (target === 'dashboard') loadSchedules();
-		if (target === 'rules') loadRules();
+		if (target === 'rules-builder') loadRulesBuilder();
 		if (target === 'history') loadHistory();
 	});
 });
 
 // modal close
-closeModalBtn.addEventListener('click', () => resultsModal.classList.add('hidden'));
+closeModalBtn.addEventListener('click', () => resultsModal.classList.remove('active'));
 globalThis.addEventListener('click', (e) => {
-	if (e.target === resultsModal) resultsModal.classList.add('hidden');
+	if (e.target === resultsModal) resultsModal.classList.remove('active');
 });
 
-// dashboard / schedules
+// Folder Pickers (wails Go dialog binding)
+browseSchedFolder.addEventListener('click', async () => {
+	try {
+		const path = await SelectDirectory('Select target folder for schedule');
+		if (path) {
+			schedFolder.value = path;
+		}
+	} catch (err) {
+		alert(`Error selecting directory: ${err}`);
+	}
+});
+
+browseRunFolder.addEventListener('click', async () => {
+	try {
+		const path = await SelectDirectory('Select folder to organize');
+		if (path) {
+			runFolder.value = path;
+		}
+	} catch (err) {
+		alert(`Error selecting directory: ${err}`);
+	}
+});
+
+// cron option change helper
+schedCron.addEventListener('change', () => {
+	if (schedCron.value === 'custom') {
+		customCronGroup.classList.remove('hidden');
+	} else {
+		customCronGroup.classList.add('hidden');
+	}
+});
+
+// schedules
 async function loadSchedules() {
 	try {
 		schedulesList.innerHTML = '<div class="loading">Loading schedules...</div>';
 		const schedules = await GetSchedules();
 		if (!schedules || schedules.length === 0) {
-			schedulesList.innerHTML = '<div class="no-data">No active schedules configured.</div>';
+			schedulesList.innerHTML = '<div class="empty-state">No active schedules configured.</div>';
 			return;
 		}
 
 		schedulesList.innerHTML = '';
 		schedules.forEach(s => {
 			const card = document.createElement('div');
-			card.className = 'card schedule-card';
+			card.className = 'card sched-card';
 
-			const statusClass = s.Status === 'active' ? 'status-active' : 'status-inactive';
+			const statusClass = s.Status === 'active' ? '' : 'inactive';
 			const statusLabel = s.Status === 'active' ? 'Running' : 'Stopped';
 
-			// format folders display
-			const foldersList = s.Folders.map(f => `<span class="badge badge-secondary">${f}</span>`).join(' ');
-
-			// format last run display
 			let lastRunText = 'never';
 			if (s.LastRun && !s.LastRun.startsWith('0001')) {
 				const d = new Date(s.LastRun);
 				lastRunText = d.toLocaleString();
 			}
 
-			// format last files display
 			let lastFilesText = '';
 			if (s.LastFiles > 0) {
 				lastFilesText = `<span class="badge badge-success">${s.LastFiles} files organized</span>`;
 			} else if (s.LastFiles === 0 && !s.LastRun.startsWith('0001')) {
-				lastFilesText = '<span class="badge badge-secondary">0 files organized</span>';
+				lastFilesText = '<span class="badge">0 files</span>';
 			}
 
+			// pretty format cron
+			let cronLabel = s.Cron;
+			if (s.Cron === '0 * * * *') cronLabel = 'Tiap Jam';
+			if (s.Cron === '0 0 * * *') cronLabel = 'Tiap Hari';
+			if (s.Cron === '0 0 * * 0') cronLabel = 'Tiap Minggu';
+
 			card.innerHTML = `
-				<div class="schedule-header">
-					<div>
-						<h3 class="schedule-title">${s.Name}</h3>
-						<span class="status-indicator ${statusClass}">${statusLabel}</span>
+				<div>
+					<div style="display:flex; justify-content:space-between; align-items:center;">
+						<span style="font-size:16px; font-weight:600;">${s.Name}</span>
+						<span class="status-badge ${statusClass}"><span class="status-dot"></span>${statusLabel}</span>
 					</div>
-					<div class="schedule-actions">
+					<div class="sched-meta">
+						<div class="meta-item">
+							<span class="meta-label">Folder Target</span>
+							<span class="meta-val"><code>${s.Folders.join(', ')}</code></span>
+						</div>
+						<div class="meta-item">
+							<span class="meta-label">Frekuensi</span>
+							<span class="meta-val">${cronLabel}</span>
+						</div>
+					</div>
+				</div>
+				<div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border-subtle); padding-top:16px; margin-top:12px;">
+					<span style="font-size:12px; color:var(--text-tertiary)">Last: ${lastRunText} ${lastFilesText}</span>
+					<div style="display:flex; gap:8px;">
 						${s.Status === 'active' ?
-							`<button class="btn btn-secondary btn-sm stop-btn" data-name="${s.Name}">Stop</button>` :
-							`<button class="btn btn-secondary btn-sm start-btn" data-name="${s.Name}">Start</button>`
+							`<button class="btn btn-secondary stop-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.Name}">Stop</button>` :
+							`<button class="btn btn-primary start-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.Name}">Start</button>`
 						}
-						<button class="btn btn-secondary btn-sm edit-btn" data-name="${s.Name}">Edit</button>
-						<button class="btn btn-danger btn-sm delete-btn" data-name="${s.Name}">Delete</button>
+						<button class="btn btn-secondary edit-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.Name}">Edit</button>
+						<button class="btn btn-danger delete-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.Name}">Delete</button>
 					</div>
-				</div>
-				<div class="schedule-body">
-					<div class="info-row"><strong>Cron:</strong> <code>${s.Cron}</code></div>
-					<div class="info-row"><strong>Service:</strong> <code>${s.Service || 'none'}</code></div>
-					<div class="info-row"><strong>Folders:</strong> ${foldersList}</div>
-					${s.Config ? `<div class="info-row"><strong>Config:</strong> <code>${s.Config}</code></div>` : ''}
-					<div class="info-row last-run-info">
-						<strong>Last Run:</strong> <span>${lastRunText} ${lastFilesText}</span>
-					</div>
-				</div>
-				<div class="schedule-footer">
-					<button class="btn btn-primary btn-sm run-now-btn" data-name="${s.Name}">Run Now</button>
 				</div>
 			`;
 			schedulesList.appendChild(card);
 		});
 
-		// register event listeners
 		document.querySelectorAll('.stop-btn').forEach(b => b.addEventListener('click', handleStop));
 		document.querySelectorAll('.start-btn').forEach(b => b.addEventListener('click', handleStart));
 		document.querySelectorAll('.edit-btn').forEach(b => b.addEventListener('click', handleEdit));
 		document.querySelectorAll('.delete-btn').forEach(b => b.addEventListener('click', handleDelete));
-		document.querySelectorAll('.run-now-btn').forEach(b => b.addEventListener('click', handleRunNow));
 
 	} catch (err) {
-		schedulesList.innerHTML = `<div class="error">Error loading schedules: ${err}</div>`;
+		schedulesList.innerHTML = `<div class="alert alert-danger">Error: ${err}</div>`;
 	}
 }
 
-// schedule management functions
+// open/close schedule modal
 addSchedBtn.addEventListener('click', () => {
 	schedFormTitle.textContent = 'New Schedule';
 	schedOrigName.value = '';
 	schedForm.reset();
-	schedFormCard.classList.remove('hidden');
+	customCronGroup.classList.add('hidden');
+	schedModal.classList.add('active');
 });
 
-cancelSchedBtn.addEventListener('click', () => {
-	schedFormCard.classList.add('hidden');
-});
+closeSchedModal.addEventListener('click', () => schedModal.classList.remove('active'));
+cancelSchedBtn.addEventListener('click', () => schedModal.classList.remove('active'));
 
 schedForm.addEventListener('submit', async (e) => {
 	e.preventDefault();
 	const name = schedName.value.trim();
-	const folders = schedFolders.value.split(',').map(f => f.trim()).filter(Boolean);
-	const cron = schedCron.value.trim();
+	const folder = schedFolder.value.trim();
+	let cron = schedCron.value;
+	if (cron === 'custom') {
+		cron = schedCustomCron.value.trim();
+	}
 	const configPath = schedConfig.value.trim();
 
 	try {
-		await SaveSchedule(name, folders, cron, configPath);
-		schedFormCard.classList.add('hidden');
+		await SaveSchedule(name, [folder], cron, configPath);
+		schedModal.classList.remove('active');
 		loadSchedules();
 	} catch (err) {
 		alert(`Error saving schedule: ${err}`);
@@ -174,7 +224,7 @@ async function handleStart(e) {
 		await StartSchedule(name);
 		loadSchedules();
 	} catch (err) {
-		alert(`Error starting schedule: ${err}`);
+		alert(`Error starting: ${err}`);
 	}
 }
 
@@ -184,7 +234,7 @@ async function handleStop(e) {
 		await StopSchedule(name);
 		loadSchedules();
 	} catch (err) {
-		alert(`Error stopping schedule: ${err}`);
+		alert(`Error stopping: ${err}`);
 	}
 }
 
@@ -197,130 +247,257 @@ async function handleEdit(e) {
 			schedFormTitle.textContent = 'Edit Schedule';
 			schedOrigName.value = s.Name;
 			schedName.value = s.Name;
-			schedFolders.value = s.Folders.join(', ');
-			schedCron.value = s.Cron;
+			schedFolder.value = s.Folders[0] || '';
 			schedConfig.value = s.Config || '';
-			schedFormCard.classList.remove('hidden');
+			
+			if (['0 * * * *', '0 0 * * *', '0 0 * * 0'].includes(s.Cron)) {
+				schedCron.value = s.Cron;
+				customCronGroup.classList.add('hidden');
+			} else {
+				schedCron.value = 'custom';
+				schedCustomCron.value = s.Cron;
+				customCronGroup.classList.remove('hidden');
+			}
+			schedModal.classList.add('active');
 		}
 	} catch (err) {
-		alert(`Error editing schedule: ${err}`);
+		alert(`Error loading schedule for edit: ${err}`);
 	}
 }
 
 async function handleDelete(e) {
 	const name = e.target.dataset.name;
-	if (confirm(`Are you sure you want to delete schedule "${name}"?`)) {
+	if (confirm(`Hapus schedule "${name}"?`)) {
 		try {
 			await DeleteSchedule(name);
 			loadSchedules();
 		} catch (err) {
-			alert(`Error deleting schedule: ${err}`);
+			alert(`Error deleting: ${err}`);
 		}
 	}
 }
 
-async function handleRunNow(e) {
-	const name = e.target.dataset.name;
+// run manual
+runOrganizeBtn.addEventListener('click', () => triggerRun(false));
+runDryBtn.addEventListener('click', () => triggerRun(true));
+
+async function triggerRun(dryRun) {
+	const folder = runFolder.value.trim();
+	if (!folder) {
+		alert('Silakan pilih folder target terlebih dahulu!');
+		return;
+	}
+
+	const btn = dryRun ? runDryBtn : runOrganizeBtn;
+	const origText = btn.textContent;
+	btn.disabled = true;
+	btn.textContent = 'Processing...';
+
 	try {
-		const schedules = await GetSchedules();
-		const s = schedules.find(x => x.Name === name);
-		if (!s) return;
-
-		e.target.disabled = true;
-		e.target.textContent = 'Running...';
-
-		const resJson = await RunOrganize(s.Folders, false);
-		const results = JSON.parse(resJson);
-
-		showResultsModal(results);
-		loadSchedules();
+		const res = await RunOrganize([folder], dryRun);
+		showResultsModal(res);
 	} catch (err) {
-		alert(`Error running organizer: ${err}`);
+		alert(`Error running organize: ${err}`);
 	} finally {
-		e.target.disabled = false;
-		e.target.textContent = 'Run Now';
+		btn.disabled = false;
+		btn.textContent = origText;
 	}
 }
 
 function showResultsModal(results) {
 	modalResultsRows.innerHTML = '';
 	if (!results || results.length === 0) {
-		modalResultsRows.innerHTML = '<tr><td colspan="4" class="text-center">No files matches rules to organize.</td></tr>';
+		modalResultsRows.innerHTML = '<tr><td colspan="4" style="text-align:center;">No files matches rules to organize.</td></tr>';
 	} else {
 		results.forEach(r => {
 			const tr = document.createElement('tr');
-			const statusLabel = r.Skipped ? `Skipped: ${r.SkipReason}` : 'Success';
-			const statusClass = r.Skipped ? 'text-secondary' : 'text-success';
+			const statusLabel = r.skipped ? `Skipped: ${r.skip_reason}` : 'Success';
+			const statusClass = r.skipped ? 'text-secondary' : 'badge badge-success';
 
 			tr.innerHTML = `
-				<td><code>${r.Source}</code></td>
-				<td><span class="badge">${r.Action}</span></td>
-				<td><code>${r.Destination || '-'}</code></td>
-				<td class="${statusClass}">${statusLabel}</td>
+				<td><code>${r.source}</code></td>
+				<td><span class="badge">${r.action}</span></td>
+				<td><code>${r.destination || '-'}</code></td>
+				<td><span class="${r.skipped ? '' : statusClass}">${statusLabel}</span></td>
 			`;
 			modalResultsRows.appendChild(tr);
 		});
 	}
-	resultsModal.classList.remove('hidden');
+	resultsModal.classList.add('active');
 }
 
-// rules config editor
-async function loadRules() {
+closeModalBtn.addEventListener('click', () => resultsModal.classList.remove('active'));
+
+// rules builder (visual configuration)
+async function loadRulesBuilder() {
 	try {
-		const content = await GetRules();
-		rulesTextarea.value = content;
-		validationAlert.className = 'alert hidden';
+		rulesList.innerHTML = '<div class="loading">Loading rules...</div>';
+		activeRules = await GetVisualRules();
+		renderRules();
 	} catch (err) {
-		alert(`Error loading rules: ${err}`);
+		rulesList.innerHTML = `<div class="alert alert-danger">Error loading rules: ${err}</div>`;
 	}
 }
 
-validateRulesBtn.addEventListener('click', async () => {
-	const content = rulesTextarea.value;
-	try {
-		const errMsg = await ValidateRules(content);
-		if (errMsg) {
-			validationAlert.className = 'alert alert-danger';
-			validationAlert.textContent = `Validation Error: ${errMsg}`;
-		} else {
-			validationAlert.className = 'alert alert-success';
-			validationAlert.textContent = 'Configuration is valid!';
+function renderRules() {
+	rulesList.innerHTML = '';
+	if (activeRules.length === 0) {
+		rulesList.innerHTML = '<div class="empty-state">No rules defined. Click "+ Add New Rule" to create one.</div>';
+		return;
+	}
+
+	activeRules.forEach((rule, idx) => {
+		const rcard = document.createElement('div');
+		rcard.className = 'rule-card';
+
+		// tags container (extensions)
+		const tagPills = (rule.extensions || []).map(ext => `
+			<span class="tag-pill">${ext} <span class="tag-close" data-idx="${idx}" data-val="${ext}">&times;</span></span>
+		`).join('');
+
+		rcard.innerHTML = `
+			<div class="rule-field">
+				<span class="rule-field-label">File Extensions</span>
+				<div class="tags-container">
+					${tagPills}
+					<input type="text" class="tag-input" placeholder="+ add ext..." data-idx="${idx}">
+				</div>
+			</div>
+			<div class="rule-field">
+				<span class="rule-field-label">Action</span>
+				<select class="form-control action-select" data-idx="${idx}">
+					<option value="move" ${rule.action === 'move' ? 'selected' : ''}>Move File</option>
+					<option value="delete" ${rule.action === 'delete' ? 'selected' : ''}>Delete File</option>
+				</select>
+			</div>
+			<div class="rule-field">
+				<span class="rule-field-label">Destination Folder</span>
+				<div class="picker-wrapper">
+					<input type="text" class="form-control dest-input" value="${rule.destination || ''}" readonly>
+					<button type="button" class="btn btn-secondary browse-dest-btn" data-idx="${idx}">📁 Browse</button>
+				</div>
+			</div>
+			<button type="button" class="btn btn-danger remove-rule-btn" data-idx="${idx}" style="padding: 10px;">&times;</button>
+		`;
+
+		rulesList.appendChild(rcard);
+	});
+
+	// register rule interaction events
+	document.querySelectorAll('.tag-input').forEach(input => {
+		input.addEventListener('keydown', handleAddTag);
+	});
+	document.querySelectorAll('.tag-close').forEach(closeBtn => {
+		closeBtn.addEventListener('click', handleRemoveTag);
+	});
+	document.querySelectorAll('.action-select').forEach(select => {
+		select.addEventListener('change', handleActionChange);
+	});
+	document.querySelectorAll('.browse-dest-btn').forEach(btn => {
+		btn.addEventListener('click', handleBrowseDest);
+	});
+	document.querySelectorAll('.remove-rule-btn').forEach(btn => {
+		btn.addEventListener('click', handleRemoveRule);
+	});
+}
+
+// rule events
+function handleAddTag(e) {
+	if (e.key === 'Enter') {
+		e.preventDefault();
+		const val = e.target.value.trim().toLowerCase();
+		const idx = Number(e.target.dataset.idx);
+		if (val) {
+			const formattedVal = val.startsWith('.') ? val : `.${val}`;
+			if (!activeRules[idx].extensions) activeRules[idx].extensions = [];
+			if (!activeRules[idx].extensions.includes(formattedVal)) {
+				activeRules[idx].extensions.push(formattedVal);
+				renderRules();
+			}
 		}
+		e.target.value = '';
+	}
+}
+
+function handleRemoveTag(e) {
+	const idx = Number(e.target.dataset.idx);
+	const val = e.target.dataset.val;
+	activeRules[idx].extensions = activeRules[idx].extensions.filter(ext => ext !== val);
+	renderRules();
+}
+
+function handleActionChange(e) {
+	const idx = Number(e.target.dataset.idx);
+	activeRules[idx].action = e.target.value;
+}
+
+async function handleBrowseDest(e) {
+	const idx = Number(e.target.dataset.idx);
+	try {
+		const path = await SelectDirectory('Select destination folder');
+		if (path) {
+			activeRules[idx].destination = path;
+			renderRules();
+		}
+	} catch (err) {
+		alert(`Error selecting destination: ${err}`);
+	}
+}
+
+function handleRemoveRule(e) {
+	const idx = Number(e.target.dataset.idx);
+	activeRules.splice(idx, 1);
+	renderRules();
+}
+
+addRuleBtn.addEventListener('click', () => {
+	activeRules.push({
+		extensions: [],
+		filename_patterns: [],
+		destination: '',
+		action: 'move'
+	});
+	renderRules();
+});
+
+resetRulesBtn.addEventListener('click', loadRulesBuilder);
+
+saveRulesBtn.addEventListener('click', async () => {
+	try {
+		// client-side simple verification
+		for (const r of activeRules) {
+			if (!r.extensions || r.extensions.length === 0) {
+				alert('Setiap rule wajib memiliki minimal 1 file extension!');
+				return;
+			}
+			if (r.action === 'move' && !r.destination) {
+				alert('Destination folder wajib diisi jika action adalah "Move File"!');
+				return;
+			}
+		}
+
+		await SaveVisualRules(activeRules);
+		validationAlert.className = 'alert alert-success';
+		validationAlert.textContent = 'Rules saved successfully!';
+		validationAlert.classList.remove('hidden');
+		setTimeout(() => validationAlert.classList.add('hidden'), 3000);
 	} catch (err) {
 		validationAlert.className = 'alert alert-danger';
 		validationAlert.textContent = `Error: ${err}`;
+		validationAlert.classList.remove('hidden');
 	}
 });
 
-saveRulesBtn.addEventListener('click', async () => {
-	const content = rulesTextarea.value;
-	try {
-		// validate first
-		const errMsg = await ValidateRules(content);
-		if (errMsg) {
-			alert(`Cannot save. Validation failed:\n${errMsg}`);
-			return;
-		}
-
-		await SaveRules(content);
-		validationAlert.className = 'alert alert-success';
-		validationAlert.textContent = 'Config saved successfully!';
-	} catch (err) {
-		alert(`Error saving rules: ${err}`);
-	}
-});
-
-// execution history
+// history
 async function loadHistory() {
 	try {
-		historyRows.innerHTML = '<tr><td colspan="4" class="text-center">Loading history...</td></tr>';
+		historyRows.innerHTML = '<tr><td colspan="4" style="text-align:center;">Loading history...</td></tr>';
 		const runs = await GetHistory();
 		if (!runs || runs.length === 0) {
-			historyRows.innerHTML = '<tr><td colspan="4" class="text-center">No execution history found.</td></tr>';
+			historyRows.innerHTML = '<tr><td colspan="4" style="text-align:center;">No execution history found.</td></tr>';
 			return;
 		}
 
-		// sort by newest
 		runs.sort((a, b) => b.ID - a.ID);
 
 		historyRows.innerHTML = '';
@@ -337,34 +514,33 @@ async function loadHistory() {
 				<td><span class="badge">${movedCount} items</span></td>
 				<td>
 					${movedCount > 0 ?
-						`<button class="btn btn-secondary btn-sm undo-btn" data-id="${r.ID}">Undo</button>` :
-						`<span class="text-secondary">none</span>`
+						`<button class="btn btn-secondary undo-btn" style="padding:4px 8px; font-size:11px;" data-id="${r.ID}">Undo</button>` :
+						`<span style="color:var(--text-tertiary)">none</span>`
 					}
 				</td>
 			`;
 			historyRows.appendChild(tr);
 		});
 
-		// register undo handler
 		document.querySelectorAll('.undo-btn').forEach(b => b.addEventListener('click', handleUndo));
 
 	} catch (err) {
-		historyRows.innerHTML = `<tr><td colspan="4" class="text-center text-danger">Error: ${err}</td></tr>`;
+		historyRows.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--danger)">Error: ${err}</td></tr>`;
 	}
 }
 
 async function handleUndo(e) {
-	const id = Number.parseInt(e.target.dataset.id, 10);
-	if (confirm(`Are you sure you want to undo run #${id}? This will revert moved files.`)) {
+	const id = Number(e.target.dataset.id);
+	if (confirm(`Apakah Anda yakin ingin me-revert run #${id}? File-file akan dipindahkan kembali.`)) {
 		try {
 			e.target.disabled = true;
 			e.target.textContent = 'Undoing...';
 
 			const count = await UndoRun(id);
-			alert(`Reverted ${count} items successfully.`);
+			alert(`Berhasil mengembalikan ${count} file.`);
 			loadHistory();
 		} catch (err) {
-			alert(`Error undoing: ${err}`);
+			alert(`Error: ${err}`);
 		} finally {
 			e.target.disabled = false;
 			e.target.textContent = 'Undo';

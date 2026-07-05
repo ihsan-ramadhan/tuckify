@@ -6,118 +6,167 @@
     <title>tuckify</title>
 </head>
 <body>
-    <header>
-        <div class="header-container">
-            <span class="logo">tuckify</span>
+    <div id="app">
+        <header class="header">
+            <h1>tuckify</h1>
             <nav class="tabs">
-                <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
-                <button class="tab-btn" data-tab="rules">Rules Editor</button>
-                <button class="tab-btn" data-tab="history">Run History</button>
+                <button class="tab active" data-tab="dashboard">Dashboard</button>
+                <button class="tab" data-tab="run-manual">Run Manual</button>
+                <button class="tab" data-tab="rules-builder">Rules Builder</button>
+                <button class="tab" data-tab="history">Run History</button>
             </nav>
-        </div>
-    </header>
+        </header>
 
-    <main class="container">
-        <!-- Dashboard / Schedules Tab -->
-        <section id="dashboard" class="tab-content active">
-            <div class="section-header">
-                <h2>Schedules</h2>
-                <button id="add-sched-btn" class="btn btn-primary">+ Add Schedule</button>
-            </div>
-
-            <!-- Add/Edit Schedule Card -->
-            <div id="sched-form-card" class="card hidden">
-                <h3 id="sched-form-title">New Schedule</h3>
-                <form id="sched-form">
-                    <input type="hidden" id="sched-orig-name">
-                    <div class="form-group">
-                        <label for="sched-name">Name</label>
-                        <input type="text" id="sched-name" required placeholder="e.g. downloads-cleaner">
-                    </div>
-                    <div class="form-group">
-                        <label for="sched-folders">Folders (comma separated)</label>
-                        <input type="text" id="sched-folders" required placeholder="e.g. /home/user/Downloads, /home/user/Temp">
-                    </div>
-                    <div class="form-group">
-                        <label for="sched-cron">Cron Schedule</label>
-                        <input type="text" id="sched-cron" required placeholder="e.g. 0 0 * * * (daily at midnight)">
-                    </div>
-                    <div class="form-group">
-                        <label for="sched-config">Config (rules path or raw TOML override)</label>
-                        <input type="text" id="sched-config" placeholder="Leave empty for default rules.toml">
-                    </div>
-                    <div class="form-actions">
-                        <button type="button" id="cancel-sched-btn" class="btn btn-secondary">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Save Schedule</button>
-                    </div>
-                </form>
-            </div>
-
-            <div id="schedules-list" class="schedules-grid">
-                <!-- dynamically loaded -->
-            </div>
-        </section>
-
-        <!-- Rules Editor Tab -->
-        <section id="rules" class="tab-content">
-            <div class="section-header">
-                <h2>Rules Config</h2>
-                <div class="rules-actions">
-                    <button id="validate-rules-btn" class="btn btn-secondary">Validate</button>
-                    <button id="save-rules-btn" class="btn btn-primary">Save Config</button>
+        <main class="content">
+            <!-- Dashboard / Schedules Tab -->
+            <section id="dashboard" class="tab-panel active">
+                <div class="section-header">
+                    <h2>Active Schedules</h2>
+                    <button id="add-sched-btn" class="btn btn-primary">+ Add Schedule</button>
                 </div>
-            </div>
-            <div class="card">
-                <label for="rules-textarea" class="visually-hidden">Rules Configuration</label>
-                <textarea id="rules-textarea" class="rules-editor" placeholder="# tuckify rules.toml"></textarea>
-                <div id="validation-alert" class="alert hidden"></div>
-            </div>
-        </section>
 
-        <!-- Run History Tab -->
-        <section id="history" class="tab-content">
-            <div class="section-header">
-                <h2>Execution History</h2>
-            </div>
-            <div class="card">
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Timestamp</th>
-                            <th>Folders</th>
-                            <th>Items Moved</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="history-rows">
-                        <!-- dynamically loaded -->
-                    </tbody>
-                </table>
-            </div>
-        </section>
-    </main>
+                <!-- Add/Edit Schedule Modal (Floating) -->
+                <div id="sched-modal" class="modal">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3 id="sched-form-title">New Schedule</h3>
+                            <button id="close-sched-modal" class="modal-close">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="sched-form">
+                                <input type="hidden" id="sched-orig-name">
+                                <div class="form-group">
+                                    <label for="sched-name">Schedule Name</label>
+                                    <input type="text" id="sched-name" class="form-control" required placeholder="e.g. downloads-cleaner">
+                                </div>
+                                <div class="form-group">
+                                    <label for="sched-folder">Folder Target</label>
+                                    <div class="picker-wrapper">
+                                        <input type="text" id="sched-folder" class="form-control" required placeholder="Pilih folder target..." readonly>
+                                        <button type="button" id="browse-sched-folder" class="btn btn-secondary">📁 Browse...</button>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="sched-cron">Frequency</label>
+                                    <select id="sched-cron" class="form-control">
+                                        <option value="0 * * * *">Tiap Jam</option>
+                                        <option value="0 0 * * *">Tiap Hari (Tengah Malam)</option>
+                                        <option value="0 0 * * 0">Tiap Minggu</option>
+                                        <option value="custom">Kustom Cron Schedule</option>
+                                    </select>
+                                </div>
+                                <div id="custom-cron-group" class="form-group hidden">
+                                    <label for="sched-custom-cron">Custom Cron Expression</label>
+                                    <input type="text" id="sched-custom-cron" class="form-control" placeholder="e.g. 0 9 * * *">
+                                </div>
+                                <div class="form-group hidden">
+                                    <label for="sched-config">Config Path</label>
+                                    <input type="text" id="sched-config" class="form-control" placeholder="Leave empty for default">
+                                </div>
+                                <div class="form-actions">
+                                    <button type="button" id="cancel-sched-btn" class="btn btn-secondary">Cancel</button>
+                                    <button type="submit" class="btn btn-primary">Save Schedule</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="schedules-list" class="schedules-grid">
+                    <!-- dynamically loaded -->
+                </div>
+            </section>
+
+            <!-- Run Manual Tab -->
+            <section id="run-manual" class="tab-panel">
+                <div class="section-header">
+                    <h2>Run Organizer Once</h2>
+                </div>
+                <div class="card" style="max-width: 600px; margin: 0 auto;">
+                    <div class="form-group">
+                        <label>Folder Target</label>
+                        <div class="picker-wrapper">
+                            <input type="text" id="run-folder" class="form-control" placeholder="Pilih folder target..." readonly required>
+                            <button type="button" id="browse-run-folder" class="btn btn-secondary">📁 Browse...</button>
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:12px; margin-top:24px;">
+                        <button type="button" id="run-organize-btn" class="btn btn-primary" style="flex:1; justify-content:center;">▶ Run Organize</button>
+                        <button type="button" id="run-dry-btn" class="btn btn-secondary" style="flex:1; justify-content:center;">🔍 Dry Run</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Rules Builder Tab -->
+            <section id="rules-builder" class="tab-panel">
+                <div class="section-header">
+                    <h2>Rules Configuration</h2>
+                    <button type="button" id="add-rule-btn" class="btn btn-primary">+ Add New Rule</button>
+                </div>
+                
+                <div class="card">
+                    <div id="rules-list" class="rules-list">
+                        <!-- Rule cards loaded dynamically -->
+                    </div>
+                    
+                    <div id="validation-alert" class="alert hidden"></div>
+
+                    <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:24px; border-top:1px solid var(--border-subtle); padding-top:20px;">
+                        <button type="button" id="reset-rules-btn" class="btn btn-secondary">Discard</button>
+                        <button type="button" id="save-rules-btn" class="btn btn-primary">Save Rules</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Run History Tab -->
+            <section id="history" class="tab-panel">
+                <div class="section-header">
+                    <h2>Run History</h2>
+                </div>
+                <div class="card">
+                    <div class="table-wrapper">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>Source Folder</th>
+                                    <th>Files Organized</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="history-rows">
+                                <!-- dynamically loaded -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
 
     <!-- Run Results Modal -->
-    <div id="results-modal" class="modal hidden">
-        <div class="modal-content card">
+    <div id="results-modal" class="modal">
+        <div class="modal-content">
             <div class="modal-header">
                 <h3>Run Results</h3>
                 <button id="close-modal-btn" class="modal-close">&times;</button>
             </div>
             <div class="modal-body">
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>File</th>
-                            <th>Action</th>
-                            <th>Destination</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody id="modal-results-rows">
-                        <!-- dynamically loaded -->
-                    </tbody>
-                </table>
+                <div class="table-wrapper">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>File</th>
+                                <th>Action</th>
+                                <th>Destination</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="modal-results-rows">
+                            <!-- dynamically loaded -->
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
