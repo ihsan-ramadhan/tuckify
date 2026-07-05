@@ -14,6 +14,7 @@ import (
 	"github.com/ihsan-ramadhan/tuckify/internal/organizer"
 	"github.com/ihsan-ramadhan/tuckify/internal/service"
 	"github.com/ihsan-ramadhan/tuckify/internal/store"
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 type App struct {
@@ -26,6 +27,12 @@ func NewApp() *App {
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+}
+
+func (a *App) SelectDirectory(title string) (string, error) {
+	return runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: title,
+	})
 }
 
 type scheduleView struct {
