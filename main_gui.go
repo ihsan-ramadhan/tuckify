@@ -1,3 +1,5 @@
+//go:build desktop
+
 package main
 
 import (
@@ -8,14 +10,12 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 )
 
-//go:embed all:frontend/dist
+//go:embed all:gui/frontend/dist
 var assets embed.FS
 
 func main() {
-	// Create an instance of the app structure
 	app := NewApp()
 
-	// Create application with options
 	err := wails.Run(&options.App{
 		Title:  "tuckify-gui",
 		Width:  1024,
