@@ -2,7 +2,7 @@
 set -e
 
 REPO="ihsan-ramadhan/tuckify"
-VERSION="v0.1.0"
+VERSION="v0.2.0"
 
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 ARCH=$(uname -m)
