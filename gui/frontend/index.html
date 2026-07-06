@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>tuckify</title>
+</head>
+<body>
+    <div id="app">
+        <header class="header">
+            <h1>tuckify</h1>
+            <nav class="tabs">
+                <button class="tab active" data-tab="dashboard">Dashboard</button>
+                <button class="tab" data-tab="run-manual">Run Manual</button>
+                <button class="tab" data-tab="rules-builder">Rules Builder</button>
+                <button class="tab" data-tab="history">Run History</button>
+            </nav>
+        </header>
+
+        <main class="content">
+            <!-- Dashboard / Schedules Tab -->
+            <section id="dashboard" class="tab-panel active">
+                <div class="section-header">
+                    <h2>Active Schedules</h2>
+                    <button id="add-sched-btn" class="btn btn-primary">+ Add Schedule</button>
+                </div>
+
+                <!-- Add/Edit Schedule Modal (Floating) -->
+                <div id="sched-modal" class="modal">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3 id="sched-form-title">New Schedule</h3>
+                            <button id="close-sched-modal" class="modal-close">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="sched-form">
+                                <input type="hidden" id="sched-orig-name">
+                                <div class="form-group">
+                                    <label for="sched-name">Schedule Name</label>
+                                    <input type="text" id="sched-name" class="form-control" required placeholder="e.g. downloads-cleaner">
+                                </div>
+                                <div class="form-group">
+                                    <label for="sched-folder">Folders Target (dipisah koma untuk multi-folder)</label>
+                                    <div class="picker-wrapper">
+                                        <input type="text" id="sched-folder" class="form-control" required placeholder="Pilih folder target atau pisah dengan koma...">
+                                        <button type="button" id="browse-sched-folder" class="btn btn-secondary">📁 Browse...</button>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="sched-cron">Frequency</label>
+                                    <select id="sched-cron" class="form-control">
+                                        <option value="0 * * * *">Tiap Jam</option>
+                                        <option value="0 0 * * *">Tiap Hari (Tengah Malam)</option>
+                                        <option value="0 0 * * 0">Tiap Minggu</option>
+                                        <option value="custom">Kustom Cron Schedule</option>
+                                    </select>
+                                </div>
+                                <div id="custom-cron-group" class="form-group hidden">
+                                    <label for="sched-custom-cron">Custom Cron Expression</label>
+                                    <input type="text" id="sched-custom-cron" class="form-control" placeholder="e.g. 0 9 * * *">
+                                </div>
+                                <div class="form-group hidden">
+                                    <label for="sched-config">Config Path</label>
+                                    <input type="text" id="sched-config" class="form-control" placeholder="Leave empty for default">
+                                </div>
+                                <div class="form-actions">
+                                    <button type="button" id="cancel-sched-btn" class="btn btn-secondary">Cancel</button>
+                                    <button type="submit" class="btn btn-primary">Save Schedule</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="schedules-list" class="schedules-grid">
+                    <!-- dynamically loaded -->
+                </div>
+            </section>
+
+            <!-- Run Manual Tab -->
+            <section id="run-manual" class="tab-panel">
+                <div class="section-header">
+                    <h2>Run Organizer Once</h2>
+                </div>
+                <div class="card" style="max-width: 600px; margin: 0 auto;">
+                    <div class="form-group">
+                        <label for="run-folder">Folders Target (dipisah koma untuk multi-folder)</label>
+                        <div class="picker-wrapper">
+                            <input type="text" id="run-folder" class="form-control" placeholder="Pilih folder target atau pisah dengan koma..." required>
+                            <button type="button" id="browse-run-folder" class="btn btn-secondary">📁 Browse...</button>
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:12px; margin-top:24px;">
+                        <button type="button" id="run-organize-btn" class="btn btn-primary" style="flex:1; justify-content:center;">▶ Run Organize</button>
+                        <button type="button" id="run-dry-btn" class="btn btn-secondary" style="flex:1; justify-content:center;">🔍 Dry Run</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Rules Builder Tab -->
+            <section id="rules-builder" class="tab-panel">
+                <div class="section-header">
+                    <h2>Rules Configuration</h2>
+                    <button type="button" id="add-rule-btn" class="btn btn-primary">+ Add New Rule</button>
+                </div>
+                
+                <div class="card">
+                    <div class="form-group" style="max-width: 350px; margin-bottom: 24px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 16px;">
+                        <label for="conflict-strategy">Duplicate Conflict Strategy</label>
+                        <select id="conflict-strategy" class="form-control">
+                            <option value="rename">Auto Rename (Add suffix _1, _2)</option>
+                            <option value="delete_duplicate">Delete Duplicate</option>
+                        </select>
+                    </div>
+
+                    <div id="rules-list" class="rules-list">
+                        <!-- Rule cards loaded dynamically -->
+                    </div>
+                    
+                    <div id="validation-alert" class="alert hidden"></div>
+
+                    <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:24px; border-top:1px solid var(--border-subtle); padding-top:20px;">
+                        <button type="button" id="reset-rules-btn" class="btn btn-secondary">Discard</button>
+                        <button type="button" id="save-rules-btn" class="btn btn-primary">Save Rules</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Run History Tab -->
+            <section id="history" class="tab-panel">
+                <div class="section-header">
+                    <h2>Run History</h2>
+                </div>
+                <div class="card">
+                    <div class="table-wrapper">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>Source Folder</th>
+                                    <th>Files Organized</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="history-rows">
+                                <!-- dynamically loaded -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Run Results Modal -->
+    <div id="results-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Run Results</h3>
+                <button id="close-modal-btn" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="table-wrapper">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>File</th>
+                                <th>Action</th>
+                                <th>Destination</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="modal-results-rows">
+                            <!-- dynamically loaded -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Logs Modal -->
+    <div id="logs-modal" class="modal">
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header">
+                <h3 id="logs-title">Schedule Logs</h3>
+                <button id="close-logs-modal" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <pre id="logs-content" style="background: var(--bg-primary); padding: 15px; border-radius: 6px; font-family: monospace; font-size: 13px; color: var(--text-secondary); max-height: 400px; overflow-y: auto; white-space: pre-wrap; border: 1px solid var(--border-subtle);"></pre>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+</body>
+</html>
