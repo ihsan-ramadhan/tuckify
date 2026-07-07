@@ -71,6 +71,21 @@ const confirmOkBtn = document.getElementById('confirm-ok-btn');
 const confirmCancelBtn = document.getElementById('confirm-cancel-btn');
 let confirmCallback = null;
 
+const alertModal = document.getElementById('alert-modal');
+const closeAlertModal = document.getElementById('close-alert-modal');
+const alertTitle = document.getElementById('alert-title');
+const alertMessage = document.getElementById('alert-message');
+const alertOkBtn = document.getElementById('alert-ok-btn');
+
+function showAlert(message, title = 'Notification') {
+	alertTitle.textContent = title;
+	alertMessage.textContent = message;
+	alertModal.classList.add('active');
+}
+
+closeAlertModal.addEventListener('click', () => alertModal.classList.remove('active'));
+alertOkBtn.addEventListener('click', () => alertModal.classList.remove('active'));
+
 function showConfirmModal(title, message, okLabel, cb, okClass) {
 	confirmTitle.textContent = title;
 	confirmMessage.textContent = message;
@@ -111,6 +126,7 @@ globalThis.addEventListener('click', (e) => {
 	if (e.target === resultsModal) resultsModal.classList.remove('active');
 	if (e.target === logsModal) logsModal.classList.remove('active');
 	if (e.target === confirmModal) confirmModal.classList.remove('active');
+	if (e.target === alertModal) alertModal.classList.remove('active');
 });
 
 function updateBrowseBtn(input, btn) {
@@ -132,7 +148,7 @@ browseSchedFolder.addEventListener('click', async () => {
 			updateBrowseBtn(schedFolder, browseSchedFolder);
 		}
 	} catch (err) {
-		alert(`Error selecting directory: ${err}`);
+		showAlert(`Error selecting directory: ${err}`);
 	}
 });
 
@@ -151,7 +167,7 @@ browseRunFolder.addEventListener('click', async () => {
 			updateBrowseBtn(runFolder, browseRunFolder);
 		}
 	} catch (err) {
-		alert(`Error selecting directory: ${err}`);
+		showAlert(`Error selecting directory: ${err}`);
 	}
 });
 
@@ -402,7 +418,7 @@ schedForm.addEventListener('submit', async (e) => {
 		schedModal.classList.remove('active');
 		loadDashboard();
 	} catch (err) {
-		alert(`Error saving schedule: ${err}`);
+		showAlert(`Error saving schedule: ${err}`);
 	}
 });
 
@@ -412,7 +428,7 @@ async function handleStart(e) {
 		await StartSchedule(name);
 		loadDashboard();
 	} catch (err) {
-		alert(`Error starting: ${err}`);
+		showAlert(`Error starting: ${err}`);
 	}
 }
 
@@ -422,7 +438,7 @@ async function handleStop(e) {
 		await StopSchedule(name);
 		loadDashboard();
 	} catch (err) {
-		alert(`Error stopping: ${err}`);
+		showAlert(`Error stopping: ${err}`);
 	}
 }
 
@@ -436,7 +452,7 @@ async function handleRestart(e) {
 		await RestartSchedule(name);
 		loadDashboard();
 	} catch (err) {
-		alert(`Error restarting: ${err}`);
+		showAlert(`Error restarting: ${err}`);
 	} finally {
 		btn.disabled = false;
 		btn.innerHTML = origHtml;
@@ -481,7 +497,7 @@ async function handleEdit(e) {
 			schedModal.classList.add('active');
 		}
 	} catch (err) {
-		alert(`Error loading schedule for edit: ${err}`);
+		showAlert(`Error loading schedule for edit: ${err}`);
 	}
 }
 
@@ -492,7 +508,7 @@ async function handleDelete(e) {
 			await DeleteSchedule(name);
 			loadDashboard();
 		} catch (err) {
-			alert(`Error deleting: ${err}`);
+			showAlert(`Error deleting: ${err}`);
 		}
 	});
 }
@@ -504,13 +520,13 @@ runDryBtn.addEventListener('click', () => triggerRun(true));
 async function triggerRun(dryRun) {
 	const folderVal = runFolder.value.trim();
 	if (!folderVal) {
-		alert('Please select a target folder first!');
+		showAlert('Please select a target folder first!');
 		return;
 	}
 
 	const folders = folderVal.split(',').map(s => s.trim()).filter(s => s !== '');
 	if (folders.length === 0) {
-		alert('Please enter a valid target folder!');
+		showAlert('Please enter a valid target folder!');
 		return;
 	}
 
@@ -523,7 +539,7 @@ async function triggerRun(dryRun) {
 		const results = await RunOrganize(folders, dryRun);
 		showResultsModal(results, dryRun);
 	} catch (err) {
-		alert(`Error running organizer: ${err}`);
+		showAlert(`Error running organizer: ${err}`);
 	} finally {
 		btn.disabled = false;
 		btn.innerHTML = origHtml;
@@ -724,7 +740,7 @@ async function handleBrowseDest(e) {
 			renderRules();
 		}
 	} catch (err) {
-		alert(`Error selecting destination: ${err}`);
+		showAlert(`Error selecting destination: ${err}`);
 	}
 }
 
@@ -778,11 +794,11 @@ saveRulesBtn.addEventListener('click', async () => {
 		const hasDest = r.action === 'delete' || (r.destination && r.destination.trim());
 
 		if (!hasExt && !hasPattern && !hasRegex) {
-			alert('Each rule must have at least one match criteria: file extension, filename pattern, or filename regex.');
+			showAlert('Each rule must have at least one match criteria: file extension, filename pattern, or filename regex.');
 			return;
 		}
 		if (!hasDest && r.action !== 'delete') {
-			alert('Destination folder is required when action is "Move File"!');
+			showAlert('Destination folder is required when action is "Move File"!');
 			return;
 		}
 	}
@@ -874,7 +890,7 @@ async function handleDeleteHistory(e) {
 			await DeleteHistoryRun(id);
 			loadHistory();
 		} catch (err) {
-			alert(`Error deleting history: ${err}`);
+			showAlert(`Error deleting history: ${err}`);
 		}
 	});
 }
@@ -889,10 +905,10 @@ async function handleUndo(e) {
 			btn.innerHTML = '<span class="btn-spinner"></span> Undoing...';
 
 			const count = await UndoRun(id);
-			alert(`Successfully restored ${count} file(s).`);
+			showAlert(`Successfully restored ${count} file(s).`);
 			loadHistory();
 		} catch (err) {
-			alert(`Error: ${err}`);
+			showAlert(`Error: ${err}`);
 		} finally {
 			btn.disabled = false;
 			btn.innerHTML = origHtml;
@@ -907,7 +923,7 @@ document.getElementById('clear-history-btn').addEventListener('click', () => {
 			await ClearHistory();
 			loadHistory();
 		} catch (err) {
-			alert(`Error clearing history: ${err}`);
+			showAlert(`Error clearing history: ${err}`);
 		}
 	}, 'btn btn-danger');
 });
@@ -916,21 +932,21 @@ document.getElementById('clear-history-btn').addEventListener('click', () => {
 document.getElementById('startup-all-btn').addEventListener('click', async () => {
 	const schedules = await GetSchedules();
 	if (!schedules || schedules.length === 0) {
-		alert('No schedules to start. Click "+ Add Schedule" to create one first.');
+		showAlert('No schedules to start. Click "+ Add Schedule" to create one first.');
 		return;
 	}
 	try {
 		await StartupAll();
 		loadDashboard();
 	} catch (err) {
-		alert(`Error starting all: ${err}`);
+		showAlert(`Error starting all: ${err}`);
 	}
 });
 
 document.getElementById('unstartup-all-btn').addEventListener('click', async () => {
 	const schedules = await GetSchedules();
 	if (!schedules || schedules.length === 0) {
-		alert('No schedules configured. Click "+ Add Schedule" to create one first.');
+		showAlert('No schedules configured. Click "+ Add Schedule" to create one first.');
 		return;
 	}
 	showConfirmModal('Stop All', 'Stop all running services?', 'Stop All', async () => {
@@ -938,7 +954,7 @@ document.getElementById('unstartup-all-btn').addEventListener('click', async () 
 			await UnstartupAll();
 			loadDashboard();
 		} catch (err) {
-			alert(`Error stopping all: ${err}`);
+			showAlert(`Error stopping all: ${err}`);
 		}
 	}, 'btn btn-primary');
 });
