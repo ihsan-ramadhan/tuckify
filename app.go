@@ -41,6 +41,7 @@ func (a *App) SelectDirectory(title string) (string, error) {
 type RuleView struct {
 	Extensions       []string `json:"extensions"`
 	FilenamePatterns []string `json:"filename_patterns"`
+	FilenameRegex    []string `json:"filename_regex"`
 	Destination      string   `json:"destination"`
 	Action           string   `json:"action"`
 }
@@ -64,6 +65,7 @@ func (a *App) GetVisualRules() ([]RuleView, error) {
 		views = append(views, RuleView{
 			Extensions:       r.Extensions,
 			FilenamePatterns: r.FilenamePatterns,
+			FilenameRegex:    r.FilenameRegex,
 			Destination:      r.Destination,
 			Action:           action,
 		})
@@ -88,6 +90,7 @@ func (a *App) SaveVisualRules(rules []RuleView) error {
 		cfg.Rules = append(cfg.Rules, config.Rule{
 			Extensions:       r.Extensions,
 			FilenamePatterns: r.FilenamePatterns,
+			FilenameRegex:    r.FilenameRegex,
 			Destination:      r.Destination,
 			Action:           r.Action,
 		})
@@ -394,6 +397,14 @@ func (a *App) GetHistory() ([]history.Run, error) {
 
 func (a *App) UndoRun(id int) (int, error) {
 	return history.Undo(id)
+}
+
+func (a *App) DeleteHistoryRun(id int) error {
+	return history.Delete(id)
+}
+
+func (a *App) ClearHistory() error {
+	return history.ClearAll()
 }
 
 func (a *App) GetLogs(name string, lines int) (string, error) {

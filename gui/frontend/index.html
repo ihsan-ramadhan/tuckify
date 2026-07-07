@@ -77,10 +77,10 @@
                                     <input type="text" id="sched-name" class="form-control" required placeholder="e.g. downloads-cleaner">
                                 </div>
                                 <div class="form-group">
-                                    <label for="sched-folder">Folders Target (dipisah koma untuk multi-folder)</label>
+                                    <label for="sched-folder">Target Folders</label>
                                     <div class="picker-wrapper">
-                                        <input type="text" id="sched-folder" class="form-control" required placeholder="Pilih folder target atau pisah dengan koma...">
-                                        <button type="button" id="browse-sched-folder" class="btn btn-secondary">📁 Browse...</button>
+                                        <input type="text" id="sched-folder" class="form-control" required placeholder="Select folders or separate with commas...">
+                                        <button type="button" id="browse-sched-folder" class="btn btn-secondary"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> Browse...</button>
                                     </div>
                                 </div>
                                 <div class="form-group">
@@ -130,15 +130,15 @@
                 </div>
                 <div class="card" style="max-width: 600px; margin: 0 auto;">
                     <div class="form-group">
-                        <label for="run-folder">Folders Target (dipisah koma untuk multi-folder)</label>
+                        <label for="run-folder">Target Folders</label>
                         <div class="picker-wrapper">
-                            <input type="text" id="run-folder" class="form-control" placeholder="Pilih folder target atau pisah dengan koma..." required>
-                            <button type="button" id="browse-run-folder" class="btn btn-secondary">📁 Browse...</button>
+                            <input type="text" id="run-folder" class="form-control" placeholder="Select folders or separate with commas..." required>
+                            <button type="button" id="browse-run-folder" class="btn btn-secondary"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> Browse...</button>
                         </div>
                     </div>
                     <div style="display:flex; gap:12px; margin-top:24px;">
-                        <button type="button" id="run-organize-btn" class="btn btn-primary" style="flex:1; justify-content:center;">▶ Run Organize</button>
-                        <button type="button" id="run-dry-btn" class="btn btn-secondary" style="flex:1; justify-content:center;">🔍 Dry Run</button>
+                        <button type="button" id="run-organize-btn" class="btn btn-primary" style="flex:1; justify-content:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run Organize</button>
+                        <button type="button" id="run-dry-btn" class="btn btn-secondary" style="flex:1; justify-content:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Dry Run</button>
                     </div>
                 </div>
             </section>
@@ -179,6 +179,7 @@
             <section id="history" class="tab-panel">
                 <div class="section-header">
                     <h2>Run History</h2>
+                    <button id="clear-history-btn" class="btn btn-danger" style="padding:6px 12px; font-size:12px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Clear All</button>
                 </div>
                 <div class="card">
                     <div class="table-wrapper">
@@ -223,6 +224,23 @@
                             <!-- dynamically loaded -->
                         </tbody>
                     </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirm-modal" class="modal">
+        <div class="modal-content" style="max-width: 420px;">
+            <div class="modal-header">
+                <h3 id="confirm-title">Confirm</h3>
+                <button id="close-confirm-modal" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="confirm-message" style="margin-bottom:24px; line-height:1.6;"></p>
+                <div style="display:flex; gap:12px; justify-content:flex-end;">
+                    <button id="confirm-cancel-btn" class="btn btn-secondary">Cancel</button>
+                    <button id="confirm-ok-btn" class="btn btn-danger">Delete</button>
                 </div>
             </div>
         </div>

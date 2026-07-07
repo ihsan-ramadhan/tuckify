@@ -1,12 +1,13 @@
 import './style.css';
 import './app.css';
+import { ICONS } from './icons.js';
 
 import {
 	GetSchedules, SaveSchedule, StartSchedule, StopSchedule, DeleteSchedule,
 	StartupAll, UnstartupAll, RestartSchedule,
 	GetVisualRules, SaveVisualRules,
 	RunOrganize,
-	GetHistory, UndoRun,
+	GetHistory, UndoRun, DeleteHistoryRun, ClearHistory,
 	SelectDirectory, GetLogs,
 	GetConflictStrategy, SaveConflictStrategy
 } from '../wailsjs/go/main/App';
@@ -62,6 +63,30 @@ const closeLogsModal = document.getElementById('close-logs-modal');
 const logsTitle = document.getElementById('logs-title');
 const logsContent = document.getElementById('logs-content');
 
+const confirmModal = document.getElementById('confirm-modal');
+const closeConfirmModal = document.getElementById('close-confirm-modal');
+const confirmTitle = document.getElementById('confirm-title');
+const confirmMessage = document.getElementById('confirm-message');
+const confirmOkBtn = document.getElementById('confirm-ok-btn');
+const confirmCancelBtn = document.getElementById('confirm-cancel-btn');
+let confirmCallback = null;
+
+function showConfirmModal(title, message, okLabel, cb, okClass) {
+	confirmTitle.textContent = title;
+	confirmMessage.textContent = message;
+	confirmOkBtn.textContent = okLabel || 'Delete';
+	confirmOkBtn.className = okClass || 'btn btn-danger';
+	confirmCallback = cb;
+	confirmModal.classList.add('active');
+}
+
+closeConfirmModal.addEventListener('click', () => confirmModal.classList.remove('active'));
+confirmCancelBtn.addEventListener('click', () => confirmModal.classList.remove('active'));
+confirmOkBtn.addEventListener('click', () => {
+	confirmModal.classList.remove('active');
+	if (confirmCallback) confirmCallback();
+	confirmCallback = null;
+});
 // tab switcher
 tabs.forEach(btn => {
 	btn.addEventListener('click', () => {
@@ -85,7 +110,13 @@ closeLogsModal.addEventListener('click', () => logsModal.classList.remove('activ
 globalThis.addEventListener('click', (e) => {
 	if (e.target === resultsModal) resultsModal.classList.remove('active');
 	if (e.target === logsModal) logsModal.classList.remove('active');
+	if (e.target === confirmModal) confirmModal.classList.remove('active');
 });
+
+function updateBrowseBtn(input, btn) {
+	const hasValue = input.value.trim().length > 0;
+	btn.innerHTML = `${ICONS.folder} ${hasValue ? 'Add More' : 'Browse...'}`;
+}
 
 // Folder Pickers (wails Go dialog binding)
 browseSchedFolder.addEventListener('click', async () => {
@@ -98,11 +129,14 @@ browseSchedFolder.addEventListener('click', async () => {
 			} else {
 				schedFolder.value = path;
 			}
+			updateBrowseBtn(schedFolder, browseSchedFolder);
 		}
 	} catch (err) {
 		alert(`Error selecting directory: ${err}`);
 	}
 });
+
+schedFolder.addEventListener('input', () => updateBrowseBtn(schedFolder, browseSchedFolder));
 
 browseRunFolder.addEventListener('click', async () => {
 	try {
@@ -114,11 +148,14 @@ browseRunFolder.addEventListener('click', async () => {
 			} else {
 				runFolder.value = path;
 			}
+			updateBrowseBtn(runFolder, browseRunFolder);
 		}
 	} catch (err) {
 		alert(`Error selecting directory: ${err}`);
 	}
 });
+
+runFolder.addEventListener('input', () => updateBrowseBtn(runFolder, browseRunFolder));
 
 // Generate custom cron field dropdowns
 function buildCronFieldOptions() {
@@ -209,19 +246,24 @@ async function loadDashboard() {
 		let lastRunLabel = 'Never';
 		if (runs && runs.length > 0) {
 			for (let i = runs.length - 1; i >= 0; i--) {
-				const ts = runs[i].Timestamp;
-				if (ts && !ts.startsWith('0001')) {
-					const d = new Date(ts);
-					const now = new Date();
-					const diffMs = now - d;
-					if (!isNaN(diffMs) && diffMs >= 0) {
-						const diffMins = Math.floor(diffMs / 60000);
-						if (diffMins < 1) lastRunLabel = 'Just now';
-						else if (diffMins < 60) lastRunLabel = `${diffMins}m ago`;
-						else if (diffMins < 1440) lastRunLabel = `${Math.floor(diffMins / 60)}h ago`;
-						else lastRunLabel = `${Math.floor(diffMins / 1440)}d ago`;
+				const ts = runs[i].timestamp;
+				if (ts) {
+					let d = new Date(ts);
+					if (isNaN(d.getTime())) {
+						d = new Date(ts.replace(/(\.\d{3})\d+/, '$1'));
 					}
-					break;
+					if (!isNaN(d.getTime()) && d.getFullYear() > 2000) {
+						const now = new Date();
+						const diffMs = now - d;
+						if (!isNaN(diffMs) && diffMs >= 0) {
+							const diffMins = Math.floor(diffMs / 60000);
+							if (diffMins < 1) lastRunLabel = 'Just now';
+							else if (diffMins < 60) lastRunLabel = `${diffMins}m ago`;
+							else if (diffMins < 1440) lastRunLabel = `${Math.floor(diffMins / 60)}h ago`;
+							else lastRunLabel = `${Math.floor(diffMins / 1440)}d ago`;
+						}
+						break;
+					}
 				}
 			}
 		}
@@ -232,7 +274,11 @@ async function loadDashboard() {
 			const now = new Date();
 			const weekAgo = new Date(now);
 			weekAgo.setDate(weekAgo.getDate() - 7);
-			const weekCount = runs.filter(r => new Date(r.Timestamp) >= weekAgo).length;
+			const weekCount = runs.filter(r => {
+				if (!r.timestamp) return false;
+				const d = new Date(r.timestamp);
+				return !isNaN(d.getTime()) && d >= weekAgo;
+			}).length;
 			document.getElementById('stat-total-runs').textContent = weekCount;
 		} else {
 			document.getElementById('stat-total-runs').textContent = '0';
@@ -332,6 +378,7 @@ addSchedBtn.addEventListener('click', () => {
 	schedOrigName.value = '';
 	schedForm.reset();
 	customCronGroup.classList.add('hidden');
+	updateBrowseBtn(schedFolder, browseSchedFolder);
 	schedModal.classList.add('active');
 });
 
@@ -343,7 +390,7 @@ schedForm.addEventListener('submit', async (e) => {
 	const name = schedName.value.trim();
 	const folderVal = schedFolder.value.trim();
 	const folders = folderVal.split(',').map(s => s.trim()).filter(s => s !== '');
-	
+
 	let cron = schedCron.value;
 	if (cron === 'custom') {
 		cron = getCronFromFields();
@@ -420,7 +467,7 @@ async function handleEdit(e) {
 			schedName.value = s.Name;
 			schedFolder.value = (s.Folders || []).join(', ');
 			schedConfig.value = s.Config || '';
-			
+
 			const presets = ['0 * * * *', '0 */6 * * *', '0 12 * * *', '0 0 * * *', '0 0 * * 0', '0 0 1 * *'];
 			if (presets.includes(s.Cron)) {
 				schedCron.value = s.Cron;
@@ -430,6 +477,7 @@ async function handleEdit(e) {
 				customCronGroup.classList.remove('hidden');
 				setCronFields(s.Cron);
 			}
+			updateBrowseBtn(schedFolder, browseSchedFolder);
 			schedModal.classList.add('active');
 		}
 	} catch (err) {
@@ -439,14 +487,14 @@ async function handleEdit(e) {
 
 async function handleDelete(e) {
 	const name = e.target.dataset.name;
-	if (confirm(`Delete schedule "${name}"?`)) {
+	showConfirmModal('Delete Schedule', `Delete schedule "${name}"? This will also stop the service.`, 'Delete', async () => {
 		try {
 			await DeleteSchedule(name);
 			loadDashboard();
 		} catch (err) {
 			alert(`Error deleting: ${err}`);
 		}
-	}
+	});
 }
 
 // run manual
@@ -456,13 +504,13 @@ runDryBtn.addEventListener('click', () => triggerRun(true));
 async function triggerRun(dryRun) {
 	const folderVal = runFolder.value.trim();
 	if (!folderVal) {
-		alert('Silakan pilih folder target terlebih dahulu!');
+		alert('Please select a target folder first!');
 		return;
 	}
 
 	const folders = folderVal.split(',').map(s => s.trim()).filter(s => s !== '');
 	if (folders.length === 0) {
-		alert('Silakan masukkan folder target yang valid!');
+		alert('Please enter a valid target folder!');
 		return;
 	}
 
@@ -473,7 +521,7 @@ async function triggerRun(dryRun) {
 
 	try {
 		const results = await RunOrganize(folders, dryRun);
-		showResultsModal(results);
+		showResultsModal(results, dryRun);
 	} catch (err) {
 		alert(`Error running organizer: ${err}`);
 	} finally {
@@ -482,21 +530,22 @@ async function triggerRun(dryRun) {
 	}
 }
 
-function showResultsModal(results) {
+function showResultsModal(results, dryRun) {
 	modalResultsRows.innerHTML = '';
 	if (!results || results.length === 0) {
-		modalResultsRows.innerHTML = '<tr><td colspan="4" style="text-align:center;">No files matches rules to organize.</td></tr>';
+		modalResultsRows.innerHTML = '<tr><td colspan="4" style="text-align:center;">No files match rules to organize.</td></tr>';
 	} else {
 		results.forEach(r => {
 			const tr = document.createElement('tr');
-			const statusLabel = r.skipped ? `Skipped: ${r.skip_reason}` : 'Success';
-			const statusClass = r.skipped ? 'text-secondary' : 'badge badge-success';
+			const isPreview = dryRun && !r.skipped;
+			const statusLabel = r.skipped ? `Skipped: ${r.skip_reason}` : (isPreview ? 'Preview' : 'Success');
+			const statusClass = r.skipped ? 'text-secondary' : (isPreview ? 'badge' : 'badge badge-success');
 
 			tr.innerHTML = `
 				<td><code>${r.source}</code></td>
 				<td><span class="badge">${r.action}</span></td>
 				<td><code>${r.destination || '-'}</code></td>
-				<td><span class="${r.skipped ? '' : statusClass}">${statusLabel}</span></td>
+				<td><span class="${statusClass}">${statusLabel}</span></td>
 			`;
 			modalResultsRows.appendChild(tr);
 		});
@@ -558,14 +607,14 @@ function renderRules() {
 					<span class="rule-field-label">Destination Folder</span>
 					<div class="picker-wrapper">
 						<input type="text" class="form-control dest-input" value="${rule.destination || ''}" readonly>
-						<button type="button" class="btn btn-secondary browse-dest-btn" data-idx="${idx}">📁 Browse</button>
+						<button type="button" class="btn btn-secondary browse-dest-btn" data-idx="${idx}">${ICONS.folder} Browse</button>
+						<button type="button" class="btn btn-danger remove-rule-btn" data-idx="${idx}">${ICONS.trash}</button>
 					</div>
 				</div>
-				<button type="button" class="btn btn-danger remove-rule-btn" data-idx="${idx}" style="padding: 10px;">&times;</button>
 			</div>
-			
+
 			<button type="button" class="rule-advanced-toggle" data-idx="${idx}">${toggleText}</button>
-			
+
 			<div class="rule-advanced-panel ${showAdv}">
 				<div class="rule-field">
 					<span class="rule-field-label">Filename Patterns (Glob, e.g. *Invoice*, *Report*)</span>
@@ -680,9 +729,11 @@ async function handleBrowseDest(e) {
 }
 
 function handleRemoveRule(e) {
-	const idx = Number(e.target.dataset.idx);
-	activeRules.splice(idx, 1);
-	renderRules();
+	const idx = Number(e.currentTarget.dataset.idx);
+	showConfirmModal('Delete Rule', `Remove rule #${idx + 1}? This will discard all its settings.`, 'Remove', () => {
+		activeRules.splice(idx, 1);
+		renderRules();
+	});
 }
 
 function handleToggleAdvanced(e) {
@@ -713,16 +764,24 @@ addRuleBtn.addEventListener('click', () => {
 	renderRules();
 });
 
-resetRulesBtn.addEventListener('click', loadRulesBuilder);
+resetRulesBtn.addEventListener('click', () => {
+	validationAlert.classList.add('hidden');
+	loadRulesBuilder();
+});
 
 saveRulesBtn.addEventListener('click', async () => {
 	// client-side simple verification
 	for (const r of activeRules) {
-		if (!r.extensions || r.extensions.length === 0) {
-			alert('Each rule must have at least 1 file extension!');
+		const hasExt = r.extensions && r.extensions.length > 0;
+		const hasPattern = r.filename_patterns && r.filename_patterns.length > 0;
+		const hasRegex = r.filename_regex && r.filename_regex.length > 0;
+		const hasDest = r.action === 'delete' || (r.destination && r.destination.trim());
+
+		if (!hasExt && !hasPattern && !hasRegex) {
+			alert('Each rule must have at least one match criteria: file extension, filename pattern, or filename regex.');
 			return;
 		}
-		if (r.action === 'move' && !r.destination) {
+		if (!hasDest && r.action !== 'delete') {
 			alert('Destination folder is required when action is "Move File"!');
 			return;
 		}
@@ -755,49 +814,78 @@ async function loadHistory() {
 	try {
 		historyRows.innerHTML = '<tr><td colspan="4" style="text-align:center;">Loading history...</td></tr>';
 		const runs = await GetHistory();
+
+		historyRows.innerHTML = '';
+
 		if (!runs || runs.length === 0) {
 			historyRows.innerHTML = '<tr><td colspan="4" style="text-align:center;">No execution history found.</td></tr>';
 			return;
 		}
 
-		runs.sort((a, b) => b.ID - a.ID);
+		runs.sort((a, b) => (b.id || 0) - (a.id || 0));
 
-		historyRows.innerHTML = '';
 		runs.forEach(r => {
 			const tr = document.createElement('tr');
-			const d = new Date(r.Timestamp);
+			let dateStr = '\u2014';
+			const ts = r.timestamp;
+			if (ts) {
+				let d = new Date(ts);
+				if (isNaN(d.getTime())) {
+					d = new Date(ts.replace(/(\.\d{3})\d+/, '$1'));
+				}
+				if (!isNaN(d.getTime()) && d.getFullYear() > 2000) {
+					dateStr = d.toLocaleString();
+				}
+			}
 
-			const foldersText = (r.Folders || []).join(', ');
-			const movedCount = r.Entries ? r.Entries.length : 0;
+			const foldersText = (r.folders || []).join(', ');
+			const entriesArr = r.entries || [];
+			const movedCount = entriesArr.filter(e => e.action === 'move' || !e.action).length;
 
 			tr.innerHTML = `
-				<td>${d.toLocaleString()}</td>
-				<td><code>${foldersText}</code></td>
+				<td>${dateStr}</td>
+				<td><code>${foldersText || '\u2014'}</code></td>
 				<td><span class="badge">${movedCount} items</span></td>
 				<td>
+					<div style="display:flex; gap:6px;">
 					${movedCount > 0 ?
-						`<button class="btn btn-secondary undo-btn" style="padding:4px 8px; font-size:11px;" data-id="${r.ID}">Undo</button>` :
+						`<button class="btn btn-secondary undo-btn" style="padding:4px 8px; font-size:11px;" data-id="${r.id}">Undo</button>` :
 						`<span style="color:var(--text-tertiary)">none</span>`
 					}
+					<button class="btn btn-danger delete-history-btn" style="padding:4px 8px; font-size:11px;" data-id="${r.id}">${ICONS.trash}</button>
+					</div>
 				</td>
 			`;
 			historyRows.appendChild(tr);
 		});
 
 		document.querySelectorAll('.undo-btn').forEach(b => b.addEventListener('click', handleUndo));
+		document.querySelectorAll('.delete-history-btn').forEach(b => b.addEventListener('click', handleDeleteHistory));
 
 	} catch (err) {
 		historyRows.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--danger)">Error: ${err}</td></tr>`;
 	}
 }
 
+async function handleDeleteHistory(e) {
+	const id = Number(e.currentTarget.dataset.id);
+	showConfirmModal('Delete History', `Delete history entry #${id}? This cannot be undone.`, 'Delete', async () => {
+		try {
+			await DeleteHistoryRun(id);
+			loadHistory();
+		} catch (err) {
+			alert(`Error deleting history: ${err}`);
+		}
+	});
+}
+
 async function handleUndo(e) {
 	const id = Number(e.target.dataset.id);
-	if (confirm(`Apakah Anda yakin ingin me-revert run #${id}? File-file akan dipindahkan kembali.`)) {
+	const btn = e.target;
+	const origHtml = btn.innerHTML;
+	showConfirmModal('Undo Run', `Are you sure you want to revert run #${id}? Files will be moved back to their original locations.`, 'Undo', async () => {
 		try {
-			const btn = e.target;
 			btn.disabled = true;
-			const origHtml = btn.innerHTML;
 			btn.innerHTML = '<span class="btn-spinner"></span> Undoing...';
 
 			const count = await UndoRun(id);
@@ -809,11 +897,28 @@ async function handleUndo(e) {
 			btn.disabled = false;
 			btn.innerHTML = origHtml;
 		}
-	}
+	}, 'btn btn-primary');
 }
+
+// Clear History handler
+document.getElementById('clear-history-btn').addEventListener('click', () => {
+	showConfirmModal('Clear History', 'Delete all history entries? This cannot be undone.', 'Clear All', async () => {
+		try {
+			await ClearHistory();
+			loadHistory();
+		} catch (err) {
+			alert(`Error clearing history: ${err}`);
+		}
+	}, 'btn btn-danger');
+});
 
 // Startup / Unstartup All handlers
 document.getElementById('startup-all-btn').addEventListener('click', async () => {
+	const schedules = await GetSchedules();
+	if (!schedules || schedules.length === 0) {
+		alert('No schedules to start. Click "+ Add Schedule" to create one first.');
+		return;
+	}
 	try {
 		await StartupAll();
 		loadDashboard();
@@ -823,14 +928,19 @@ document.getElementById('startup-all-btn').addEventListener('click', async () =>
 });
 
 document.getElementById('unstartup-all-btn').addEventListener('click', async () => {
-	if (confirm('Stop all running services?')) {
+	const schedules = await GetSchedules();
+	if (!schedules || schedules.length === 0) {
+		alert('No schedules configured. Click "+ Add Schedule" to create one first.');
+		return;
+	}
+	showConfirmModal('Stop All', 'Stop all running services?', 'Stop All', async () => {
 		try {
 			await UnstartupAll();
 			loadDashboard();
 		} catch (err) {
 			alert(`Error stopping all: ${err}`);
 		}
-	}
+	}, 'btn btn-primary');
 });
 
 // initial load
