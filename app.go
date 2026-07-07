@@ -103,14 +103,14 @@ func (a *App) SaveVisualRules(rules []RuleView) error {
 }
 
 type scheduleView struct {
-	Name      string    `json:"name"`
-	Status    string    `json:"status"`
-	Service   bool      `json:"service"`
-	Cron      string    `json:"cron"`
-	Folders   []string  `json:"folders"`
-	Config    string    `json:"config"`
-	LastRun   time.Time `json:"last_run"`
-	LastFiles int       `json:"last_files"`
+	Name      string     `json:"name"`
+	Status    string     `json:"status"`
+	Service   bool       `json:"service"`
+	Cron      string     `json:"cron"`
+	Folders   []string   `json:"folders"`
+	Config    string     `json:"config"`
+	LastRun   *time.Time `json:"last_run"`
+	LastFiles int        `json:"last_files"`
 }
 
 func (a *App) GetRulesPath() string {
@@ -209,6 +209,11 @@ func (a *App) GetSchedules() ([]scheduleView, error) {
 		folders := s.GetFolders()
 		lastRun, lastFiles := findLastRunInfo(runs, folders)
 
+		var lastRunPtr *time.Time
+		if !lastRun.IsZero() {
+			lastRunPtr = &lastRun
+		}
+
 		views = append(views, scheduleView{
 			Name:      s.Name,
 			Status:    status,
@@ -216,7 +221,7 @@ func (a *App) GetSchedules() ([]scheduleView, error) {
 			Cron:      s.Cron,
 			Folders:   folders,
 			Config:    s.Config,
-			LastRun:   lastRun,
+			LastRun:   lastRunPtr,
 			LastFiles: lastFiles,
 		})
 	}

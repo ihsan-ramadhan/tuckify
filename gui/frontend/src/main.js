@@ -254,16 +254,21 @@ async function loadDashboard() {
 			const statusLabel = s.Status === 'active' ? 'Running' : 'Stopped';
 
 			let lastRunText = 'never';
-			if (s.LastRun && !s.LastRun.startsWith('0001')) {
+			if (s.LastRun) {
 				const d = new Date(s.LastRun);
-				lastRunText = d.toLocaleString();
+				if (!isNaN(d.getTime()) && d.getFullYear() > 1) {
+					lastRunText = d.toLocaleString();
+				}
 			}
 
 			let lastFilesText = '';
 			if (s.LastFiles > 0) {
 				lastFilesText = `<span class="badge badge-success">${s.LastFiles} files organized</span>`;
-			} else if (s.LastFiles === 0 && s.LastRun && !s.LastRun.startsWith('0001')) {
-				lastFilesText = '<span class="badge">0 files</span>';
+			} else if (s.LastFiles === 0 && s.LastRun) {
+				const d = new Date(s.LastRun);
+				if (!isNaN(d.getTime()) && d.getFullYear() > 1) {
+					lastFilesText = '<span class="badge">0 files</span>';
+				}
 			}
 
 			// pretty format cron
@@ -378,8 +383,8 @@ async function handleRestart(e) {
 	const name = e.target.dataset.name;
 	const btn = e.target;
 	btn.disabled = true;
-	const origText = btn.textContent;
-	btn.textContent = 'Restarting...';
+	const origHtml = btn.innerHTML;
+	btn.innerHTML = '<span class="btn-spinner"></span> Restarting...';
 	try {
 		await RestartSchedule(name);
 		loadDashboard();
@@ -387,7 +392,7 @@ async function handleRestart(e) {
 		alert(`Error restarting: ${err}`);
 	} finally {
 		btn.disabled = false;
-		btn.textContent = origText;
+		btn.innerHTML = origHtml;
 	}
 }
 
@@ -462,9 +467,9 @@ async function triggerRun(dryRun) {
 	}
 
 	const btn = dryRun ? runDryBtn : runOrganizeBtn;
-	const origText = btn.textContent;
+	const origHtml = btn.innerHTML;
 	btn.disabled = true;
-	btn.textContent = 'Processing...';
+	btn.innerHTML = '<span class="btn-spinner"></span> Processing...';
 
 	try {
 		const results = await RunOrganize(folders, dryRun);
@@ -473,7 +478,7 @@ async function triggerRun(dryRun) {
 		alert(`Error running organizer: ${err}`);
 	} finally {
 		btn.disabled = false;
-		btn.textContent = origText;
+		btn.innerHTML = origHtml;
 	}
 }
 
@@ -711,18 +716,23 @@ addRuleBtn.addEventListener('click', () => {
 resetRulesBtn.addEventListener('click', loadRulesBuilder);
 
 saveRulesBtn.addEventListener('click', async () => {
-	try {
-		// client-side simple verification
-		for (const r of activeRules) {
-			if (!r.extensions || r.extensions.length === 0) {
-				alert('Setiap rule wajib memiliki minimal 1 file extension!');
-				return;
-			}
-			if (r.action === 'move' && !r.destination) {
-				alert('Destination folder wajib diisi jika action adalah "Move File"!');
-				return;
-			}
+	// client-side simple verification
+	for (const r of activeRules) {
+		if (!r.extensions || r.extensions.length === 0) {
+			alert('Each rule must have at least 1 file extension!');
+			return;
 		}
+		if (r.action === 'move' && !r.destination) {
+			alert('Destination folder is required when action is "Move File"!');
+			return;
+		}
+	}
+
+	let origHtml;
+	try {
+		origHtml = saveRulesBtn.innerHTML;
+		saveRulesBtn.disabled = true;
+		saveRulesBtn.innerHTML = '<span class="btn-spinner"></span> Saving...';
 
 		await SaveVisualRules(activeRules);
 		await SaveConflictStrategy(conflictStrategySelect.value);
@@ -734,6 +744,9 @@ saveRulesBtn.addEventListener('click', async () => {
 		validationAlert.className = 'alert alert-danger';
 		validationAlert.textContent = `Error: ${err}`;
 		validationAlert.classList.remove('hidden');
+	} finally {
+		saveRulesBtn.disabled = false;
+		saveRulesBtn.innerHTML = origHtml || 'Save Rules';
 	}
 });
 
@@ -754,7 +767,7 @@ async function loadHistory() {
 			const tr = document.createElement('tr');
 			const d = new Date(r.Timestamp);
 
-			const foldersText = r.Folders.join(', ');
+			const foldersText = (r.Folders || []).join(', ');
 			const movedCount = r.Entries ? r.Entries.length : 0;
 
 			tr.innerHTML = `
@@ -782,17 +795,19 @@ async function handleUndo(e) {
 	const id = Number(e.target.dataset.id);
 	if (confirm(`Apakah Anda yakin ingin me-revert run #${id}? File-file akan dipindahkan kembali.`)) {
 		try {
-			e.target.disabled = true;
-			e.target.textContent = 'Undoing...';
+			const btn = e.target;
+			btn.disabled = true;
+			const origHtml = btn.innerHTML;
+			btn.innerHTML = '<span class="btn-spinner"></span> Undoing...';
 
 			const count = await UndoRun(id);
-			alert(`Berhasil mengembalikan ${count} file.`);
+			alert(`Successfully restored ${count} file(s).`);
 			loadHistory();
 		} catch (err) {
 			alert(`Error: ${err}`);
 		} finally {
-			e.target.disabled = false;
-			e.target.textContent = 'Undo';
+			btn.disabled = false;
+			btn.innerHTML = origHtml;
 		}
 	}
 }
