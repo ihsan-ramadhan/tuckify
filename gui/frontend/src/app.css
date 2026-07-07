@@ -214,6 +214,70 @@ body {
 	cursor: not-allowed;
 }
 
+/* Loading spinner */
+.btn-spinner {
+	display: inline-block;
+	width: 14px;
+	height: 14px;
+	border: 2px solid rgba(255, 255, 255, 0.2);
+	border-top-color: currentColor;
+	border-radius: 50%;
+	animation: btn-spin 0.6s linear infinite;
+}
+
+@keyframes btn-spin {
+	to { transform: rotate(360deg); }
+}
+
+/* Summary Stats Grid */
+.summary-grid {
+	display: grid;
+	grid-template-columns: repeat(4, 1fr);
+	gap: 16px;
+	margin-bottom: 32px;
+}
+
+.summary-card {
+	background: rgba(255, 255, 255, 0.02);
+	border: 1px solid var(--border-standard);
+	border-radius: 12px;
+	padding: 20px;
+	text-align: center;
+	transition: all 0.2s ease;
+}
+
+.summary-card:hover {
+	background: rgba(255, 255, 255, 0.04);
+	border-color: rgba(255, 255, 255, 0.12);
+}
+
+.summary-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 36px;
+	height: 36px;
+	border-radius: 8px;
+	background: rgba(94, 106, 210, 0.12);
+	color: var(--accent-violet);
+	margin-bottom: 12px;
+}
+
+.summary-stat {
+	font-size: 28px;
+	font-weight: 600;
+	color: var(--text-primary);
+	letter-spacing: -0.5px;
+}
+
+.summary-label {
+	font-size: 12px;
+	color: var(--text-tertiary);
+	margin-top: 4px;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+}
+
 /* Schedules Grid */
 .schedules-grid {
 	display: grid;
@@ -286,6 +350,74 @@ body {
 	background-color: currentColor;
 }
 
+/* Custom Cron Builder */
+.cron-builder {
+	margin-bottom: 20px;
+	padding: 16px;
+	background: rgba(255, 255, 255, 0.01);
+	border: 1px solid var(--border-standard);
+	border-radius: 8px;
+}
+
+.cron-builder > label {
+	display: block;
+	font-size: 11px;
+	font-weight: 600;
+	color: var(--text-tertiary);
+	margin-bottom: 12px;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+}
+
+.cron-fields {
+	display: grid;
+	grid-template-columns: repeat(5, 1fr);
+	gap: 10px;
+}
+
+.cron-field {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.cron-field label {
+	font-size: 10px;
+	font-weight: 600;
+	color: var(--text-quaternary);
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+}
+
+.cron-field select {
+	padding: 8px 10px;
+	font-size: 12px;
+}
+
+.cron-preview {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-top: 12px;
+	padding-top: 12px;
+	border-top: 1px solid var(--border-subtle);
+}
+
+.cron-preview-label {
+	font-size: 11px;
+	color: var(--text-tertiary);
+}
+
+.cron-preview code {
+	font-family: 'JetBrains Mono', monospace;
+	font-size: 12px;
+	background: rgba(94, 106, 210, 0.1);
+	color: var(--accent-violet);
+	padding: 3px 8px;
+	border-radius: 4px;
+	border: 1px solid rgba(94, 106, 210, 0.2);
+}
+
 /* Form Groups and Inputs */
 .form-group {
 	margin-bottom: 20px;
@@ -315,6 +447,29 @@ body {
 
 .form-control:focus {
 	border-color: var(--brand-indigo);
+}
+
+/* Select (dropdown) dark styling */
+select.form-control {
+	appearance: none;
+	-webkit-appearance: none;
+	-moz-appearance: none;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a8f98' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+	background-repeat: no-repeat;
+	background-position: right 12px center;
+	background-size: 14px;
+	padding-right: 36px;
+	cursor: pointer;
+}
+
+select.form-control:hover {
+	border-color: rgba(255, 255, 255, 0.15);
+}
+
+select.form-control option {
+	background: #191a1b;
+	color: var(--text-primary);
+	padding: 8px;
 }
 
 .picker-wrapper {
@@ -351,10 +506,20 @@ body {
 
 .rule-main-row {
 	display: grid;
-	grid-template-columns: 1.5fr 1fr 2fr auto;
+	grid-template-columns: 1.5fr 1fr 3fr;
 	gap: 16px;
 	align-items: center;
 	width: 100%;
+}
+
+.picker-wrapper .remove-rule-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 38px;
+	height: 38px;
+	padding: 0;
+	border-radius: 6px;
 }
 
 .rule-advanced-toggle {
@@ -584,6 +749,10 @@ tr:hover td {
 	text-align: center;
 	padding: 48px 24px;
 	color: var(--text-tertiary);
+}
+
+.schedules-grid .empty-state {
+	grid-column: 1 / -1;
 }
 
 .loading {

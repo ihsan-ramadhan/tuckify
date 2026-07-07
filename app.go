@@ -41,8 +41,13 @@ func (a *App) SelectDirectory(title string) (string, error) {
 type RuleView struct {
 	Extensions       []string `json:"extensions"`
 	FilenamePatterns []string `json:"filename_patterns"`
+	FilenameRegex    []string `json:"filename_regex"`
 	Destination      string   `json:"destination"`
 	Action           string   `json:"action"`
+	MinSize          string   `json:"min_size"`
+	MaxSize          string   `json:"max_size"`
+	MinAge           string   `json:"min_age"`
+	MaxAge           string   `json:"max_age"`
 }
 
 func (a *App) GetVisualRules() ([]RuleView, error) {
@@ -64,8 +69,13 @@ func (a *App) GetVisualRules() ([]RuleView, error) {
 		views = append(views, RuleView{
 			Extensions:       r.Extensions,
 			FilenamePatterns: r.FilenamePatterns,
+			FilenameRegex:    r.FilenameRegex,
 			Destination:      r.Destination,
 			Action:           action,
+			MinSize:          r.MinSize,
+			MaxSize:          r.MaxSize,
+			MinAge:           r.MinAge,
+			MaxAge:           r.MaxAge,
 		})
 	}
 	return views, nil
@@ -88,8 +98,13 @@ func (a *App) SaveVisualRules(rules []RuleView) error {
 		cfg.Rules = append(cfg.Rules, config.Rule{
 			Extensions:       r.Extensions,
 			FilenamePatterns: r.FilenamePatterns,
+			FilenameRegex:    r.FilenameRegex,
 			Destination:      r.Destination,
 			Action:           r.Action,
+			MinSize:          r.MinSize,
+			MaxSize:          r.MaxSize,
+			MinAge:           r.MinAge,
+			MaxAge:           r.MaxAge,
 		})
 	}
 
@@ -103,14 +118,14 @@ func (a *App) SaveVisualRules(rules []RuleView) error {
 }
 
 type scheduleView struct {
-	Name      string    `json:"name"`
-	Status    string    `json:"status"`
-	Service   bool      `json:"service"`
-	Cron      string    `json:"cron"`
-	Folders   []string  `json:"folders"`
-	Config    string    `json:"config"`
-	LastRun   time.Time `json:"last_run"`
-	LastFiles int       `json:"last_files"`
+	Name      string     `json:"name"`
+	Status    string     `json:"status"`
+	Service   bool       `json:"service"`
+	Cron      string     `json:"cron"`
+	Folders   []string   `json:"folders"`
+	Config    string     `json:"config"`
+	LastRun   *time.Time `json:"last_run"`
+	LastFiles int        `json:"last_files"`
 }
 
 func (a *App) GetRulesPath() string {
@@ -209,6 +224,11 @@ func (a *App) GetSchedules() ([]scheduleView, error) {
 		folders := s.GetFolders()
 		lastRun, lastFiles := findLastRunInfo(runs, folders)
 
+		var lastRunPtr *time.Time
+		if !lastRun.IsZero() {
+			lastRunPtr = &lastRun
+		}
+
 		views = append(views, scheduleView{
 			Name:      s.Name,
 			Status:    status,
@@ -216,7 +236,7 @@ func (a *App) GetSchedules() ([]scheduleView, error) {
 			Cron:      s.Cron,
 			Folders:   folders,
 			Config:    s.Config,
-			LastRun:   lastRun,
+			LastRun:   lastRunPtr,
 			LastFiles: lastFiles,
 		})
 	}
@@ -279,6 +299,63 @@ func (a *App) DeleteSchedule(name string) error {
 	return err
 }
 
+func (a *App) RestartSchedule(name string) error {
+	schedules, err := store.Load()
+	if err != nil {
+		return err
+	}
+	var target *store.Schedule
+	for i := range schedules {
+		if schedules[i].Name == name {
+			target = &schedules[i]
+			break
+		}
+	}
+	if target == nil {
+		return fmt.Errorf("schedule %q not found", name)
+	}
+
+	srv, err := service.NewService()
+	if err != nil {
+		return err
+	}
+
+	// Stop first, then start
+	_ = srv.Uninstall(name)
+	return srv.Install(target.Name, target.GetFolders(), target.Cron, target.Config)
+}
+
+func (a *App) StartupAll() error {
+	schedules, err := store.Load()
+	if err != nil {
+		return err
+	}
+	if len(schedules) == 0 {
+		return nil
+	}
+
+	srv, err := service.NewService()
+	if err != nil {
+		return err
+	}
+
+	var lastErr error
+	for _, s := range schedules {
+		if err := srv.Install(s.Name, s.GetFolders(), s.Cron, s.Config); err != nil {
+			lastErr = err
+		}
+	}
+	return lastErr
+}
+
+func (a *App) UnstartupAll() error {
+	srv, err := service.NewService()
+	if err != nil {
+		return err
+	}
+	return srv.Uninstall("")
+}
+
 type runResult struct {
 	Source      string `json:"source"`
 	Destination string `json:"destination"`
@@ -332,6 +409,14 @@ func (a *App) GetHistory() ([]history.Run, error) {
 
 func (a *App) UndoRun(id int) (int, error) {
 	return history.Undo(id)
+}
+
+func (a *App) DeleteHistoryRun(id int) error {
+	return history.Delete(id)
+}
+
+func (a *App) ClearHistory() error {
+	return history.ClearAll()
 }
 
 func (a *App) GetLogs(name string, lines int) (string, error) {

@@ -1,11 +1,13 @@
 import './style.css';
 import './app.css';
+import { ICONS } from './icons.js';
 
 import {
 	GetSchedules, SaveSchedule, StartSchedule, StopSchedule, DeleteSchedule,
+	StartupAll, UnstartupAll, RestartSchedule,
 	GetVisualRules, SaveVisualRules,
 	RunOrganize,
-	GetHistory, UndoRun,
+	GetHistory, UndoRun, DeleteHistoryRun, ClearHistory,
 	SelectDirectory, GetLogs,
 	GetConflictStrategy, SaveConflictStrategy
 } from '../wailsjs/go/main/App';
@@ -32,7 +34,7 @@ const schedFolder = document.getElementById('sched-folder');
 const browseSchedFolder = document.getElementById('browse-sched-folder');
 const schedCron = document.getElementById('sched-cron');
 const customCronGroup = document.getElementById('custom-cron-group');
-const schedCustomCron = document.getElementById('sched-custom-cron');
+const cronFieldsContainer = document.getElementById('cron-fields-container');
 const schedConfig = document.getElementById('sched-config');
 
 // Run Manual
@@ -61,6 +63,45 @@ const closeLogsModal = document.getElementById('close-logs-modal');
 const logsTitle = document.getElementById('logs-title');
 const logsContent = document.getElementById('logs-content');
 
+const confirmModal = document.getElementById('confirm-modal');
+const closeConfirmModal = document.getElementById('close-confirm-modal');
+const confirmTitle = document.getElementById('confirm-title');
+const confirmMessage = document.getElementById('confirm-message');
+const confirmOkBtn = document.getElementById('confirm-ok-btn');
+const confirmCancelBtn = document.getElementById('confirm-cancel-btn');
+let confirmCallback = null;
+
+const alertModal = document.getElementById('alert-modal');
+const closeAlertModal = document.getElementById('close-alert-modal');
+const alertTitle = document.getElementById('alert-title');
+const alertMessage = document.getElementById('alert-message');
+const alertOkBtn = document.getElementById('alert-ok-btn');
+
+function showAlert(message, title = 'Notification') {
+	alertTitle.textContent = title;
+	alertMessage.textContent = message;
+	alertModal.classList.add('active');
+}
+
+closeAlertModal.addEventListener('click', () => alertModal.classList.remove('active'));
+alertOkBtn.addEventListener('click', () => alertModal.classList.remove('active'));
+
+function showConfirmModal(title, message, okLabel, cb, okClass) {
+	confirmTitle.textContent = title;
+	confirmMessage.textContent = message;
+	confirmOkBtn.textContent = okLabel || 'Delete';
+	confirmOkBtn.className = okClass || 'btn btn-danger';
+	confirmCallback = cb;
+	confirmModal.classList.add('active');
+}
+
+closeConfirmModal.addEventListener('click', () => confirmModal.classList.remove('active'));
+confirmCancelBtn.addEventListener('click', () => confirmModal.classList.remove('active'));
+confirmOkBtn.addEventListener('click', () => {
+	confirmModal.classList.remove('active');
+	if (confirmCallback) confirmCallback();
+	confirmCallback = null;
+});
 // tab switcher
 tabs.forEach(btn => {
 	btn.addEventListener('click', () => {
@@ -72,7 +113,7 @@ tabs.forEach(btn => {
 		document.getElementById(target).classList.add('active');
 		currentTab = target;
 
-		if (target === 'dashboard') loadSchedules();
+		if (target === 'dashboard') loadDashboard();
 		if (target === 'rules-builder') loadRulesBuilder();
 		if (target === 'history') loadHistory();
 	});
@@ -84,7 +125,14 @@ closeLogsModal.addEventListener('click', () => logsModal.classList.remove('activ
 globalThis.addEventListener('click', (e) => {
 	if (e.target === resultsModal) resultsModal.classList.remove('active');
 	if (e.target === logsModal) logsModal.classList.remove('active');
+	if (e.target === confirmModal) confirmModal.classList.remove('active');
+	if (e.target === alertModal) alertModal.classList.remove('active');
 });
+
+function updateBrowseBtn(input, btn) {
+	const hasValue = input.value.trim().length > 0;
+	btn.innerHTML = `${ICONS.folder} ${hasValue ? 'Add More' : 'Browse...'}`;
+}
 
 // Folder Pickers (wails Go dialog binding)
 browseSchedFolder.addEventListener('click', async () => {
@@ -97,11 +145,14 @@ browseSchedFolder.addEventListener('click', async () => {
 			} else {
 				schedFolder.value = path;
 			}
+			updateBrowseBtn(schedFolder, browseSchedFolder);
 		}
 	} catch (err) {
-		alert(`Error selecting directory: ${err}`);
+		showAlert(`Error selecting directory: ${err}`);
 	}
 });
+
+schedFolder.addEventListener('input', () => updateBrowseBtn(schedFolder, browseSchedFolder));
 
 browseRunFolder.addEventListener('click', async () => {
 	try {
@@ -113,99 +164,227 @@ browseRunFolder.addEventListener('click', async () => {
 			} else {
 				runFolder.value = path;
 			}
+			updateBrowseBtn(runFolder, browseRunFolder);
 		}
 	} catch (err) {
-		alert(`Error selecting directory: ${err}`);
+		showAlert(`Error selecting directory: ${err}`);
 	}
 });
+
+runFolder.addEventListener('input', () => updateBrowseBtn(runFolder, browseRunFolder));
+
+// Generate custom cron field dropdowns
+function buildCronFieldOptions() {
+	const minuteOpts = ['*', '0', '5', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55'];
+	const hourOpts = ['*', ...Array.from({length: 24}, (_, i) => String(i))];
+	const dayOpts = ['*', ...Array.from({length: 31}, (_, i) => String(i + 1))];
+	const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+	const fields = [
+		{ key: 'min', label: 'Minute', opts: minuteOpts },
+		{ key: 'hour', label: 'Hour', opts: hourOpts },
+		{ key: 'day', label: 'Day', opts: dayOpts },
+		{ key: 'month', label: 'Month', opts: ['*', ...Array.from({length: 12}, (_, i) => String(i + 1))], labels: ['*', ...monthNames] },
+		{ key: 'weekday', label: 'Weekday', opts: ['*', '0','1','2','3','4','5','6'], labels: ['Every','Sun','Mon','Tue','Wed','Thu','Fri','Sat'] },
+	];
+
+	cronFieldsContainer.innerHTML = fields.map(f => `
+		<div class="cron-field">
+			<label>${f.label}</label>
+			<select class="form-control cron-${f.key}">
+				${f.opts.map((o, i) => `<option value="${o}">${(f.labels || f.opts)[i]}</option>`).join('')}
+			</select>
+		</div>
+	`).join('');
+
+	// Update preview on any change
+	cronFieldsContainer.querySelectorAll('select').forEach(s => {
+		s.addEventListener('change', updateCronPreview);
+	});
+}
+
+function getCronFromFields() {
+	const min = document.querySelector('.cron-min')?.value || '*';
+	const hour = document.querySelector('.cron-hour')?.value || '*';
+	const day = document.querySelector('.cron-day')?.value || '*';
+	const month = document.querySelector('.cron-month')?.value || '*';
+	const weekday = document.querySelector('.cron-weekday')?.value || '*';
+	return `${min} ${hour} ${day} ${month} ${weekday}`;
+}
+
+function setCronFields(cronExpr) {
+	const parts = (cronExpr || '* * * * *').split(' ');
+	const setVal = (sel, val) => {
+		const el = document.querySelector(sel);
+		if (el) el.value = val;
+	};
+	setVal('.cron-min', parts[0] || '*');
+	setVal('.cron-hour', parts[1] || '*');
+	setVal('.cron-day', parts[2] || '*');
+	setVal('.cron-month', parts[3] || '*');
+	setVal('.cron-weekday', parts[4] || '*');
+	updateCronPreview();
+}
+
+function updateCronPreview() {
+	document.getElementById('cron-preview-value').textContent = getCronFromFields();
+}
+
+buildCronFieldOptions();
 
 // cron option change helper
 schedCron.addEventListener('change', () => {
 	if (schedCron.value === 'custom') {
 		customCronGroup.classList.remove('hidden');
+		updateCronPreview();
 	} else {
 		customCronGroup.classList.add('hidden');
 	}
 });
 
 // schedules
-async function loadSchedules() {
-	try {
-		schedulesList.innerHTML = '<div class="loading">Loading schedules...</div>';
-		const schedules = await GetSchedules();
-		if (!schedules || schedules.length === 0) {
-			schedulesList.innerHTML = '<div class="empty-state">No active schedules configured.</div>';
-			return;
+function getLastRunLabel(runs) {
+	if (!runs || runs.length === 0) return 'Never';
+	for (let i = runs.length - 1; i >= 0; i--) {
+		const ts = runs[i].timestamp;
+		if (!ts) continue;
+		let d = new Date(ts);
+		if (Number.isNaN(d.getTime())) {
+			d = new Date(ts.replace(/(\.\d{3})\d+/, '$1'));
 		}
+		if (!Number.isNaN(d.getTime()) && d.getFullYear() > 2000) {
+			const now = new Date();
+			const diffMs = now - d;
+			if (!Number.isNaN(diffMs) && diffMs >= 0) {
+				const diffMins = Math.floor(diffMs / 60000);
+				if (diffMins < 1) return 'Just now';
+				if (diffMins < 60) return `${diffMins}m ago`;
+				if (diffMins < 1440) return `${Math.floor(diffMins / 60)}h ago`;
+				return `${Math.floor(diffMins / 1440)}d ago`;
+			}
+			break;
+		}
+	}
+	return 'Never';
+}
 
-		schedulesList.innerHTML = '';
-		schedules.forEach(s => {
-			const card = document.createElement('div');
-			card.className = 'card sched-card';
+function getWeeklyRunsCount(runs) {
+	if (!runs || runs.length === 0) return 0;
+	const now = new Date();
+	const weekAgo = new Date(now);
+	weekAgo.setDate(weekAgo.getDate() - 7);
+	return runs.filter(r => {
+		if (!r.timestamp) return false;
+		const d = new Date(r.timestamp);
+		return !Number.isNaN(d.getTime()) && d >= weekAgo;
+	}).length;
+}
 
-			const statusClass = s.Status === 'active' ? '' : 'inactive';
-			const statusLabel = s.Status === 'active' ? 'Running' : 'Stopped';
+function renderSchedules(schedules) {
+	const schedulesList = document.getElementById('schedules-list');
+	if (!schedules || schedules.length === 0) {
+		schedulesList.innerHTML = '<div class="empty-state">No schedules configured. Click "+ Add Schedule" to create one.</div>';
+		return;
+	}
 
-			let lastRunText = 'never';
-			if (s.LastRun && !s.LastRun.startsWith('0001')) {
-				const d = new Date(s.LastRun);
+	schedulesList.innerHTML = '';
+	schedules.forEach(s => {
+		const card = document.createElement('div');
+		card.className = 'card sched-card';
+
+		const statusClass = s.status === 'active' ? '' : 'inactive';
+		const statusLabel = s.status === 'active' ? 'Running' : 'Stopped';
+
+		let lastRunText = 'never';
+		if (s.last_run) {
+			const d = new Date(s.last_run);
+			if (!Number.isNaN(d.getTime()) && d.getFullYear() > 1) {
 				lastRunText = d.toLocaleString();
 			}
+		}
 
-			let lastFilesText = '';
-			if (s.LastFiles > 0) {
-				lastFilesText = `<span class="badge badge-success">${s.LastFiles} files organized</span>`;
-			} else if (s.LastFiles === 0 && !s.LastRun.startsWith('0001')) {
+		let lastFilesText = '';
+		if (s.last_files > 0) {
+			lastFilesText = `<span class="badge badge-success">${s.last_files} files organized</span>`;
+		} else if (s.last_files === 0 && s.last_run) {
+			const d = new Date(s.last_run);
+			if (!Number.isNaN(d.getTime()) && d.getFullYear() > 1) {
 				lastFilesText = '<span class="badge">0 files</span>';
 			}
+		}
 
-			// pretty format cron
-			let cronLabel = s.Cron;
-			if (s.Cron === '0 * * * *') cronLabel = 'Tiap Jam';
-			if (s.Cron === '0 0 * * *') cronLabel = 'Tiap Hari';
-			if (s.Cron === '0 0 * * 0') cronLabel = 'Tiap Minggu';
+		// pretty format cron
+		let cronLabel = s.cron;
+		if (s.cron === '0 * * * *') cronLabel = 'Every Hour';
+		else if (s.cron === '0 */6 * * *') cronLabel = 'Every 6 Hours';
+		else if (s.cron === '0 12 * * *') cronLabel = 'Daily at Noon';
+		else if (s.cron === '0 0 * * *') cronLabel = 'Daily at Midnight';
+		else if (s.cron === '0 0 * * 0') cronLabel = 'Weekly (Sunday)';
+		else if (s.cron === '0 0 1 * *') cronLabel = 'Monthly (1st)';
 
-			card.innerHTML = `
-				<div>
-					<div style="display:flex; justify-content:space-between; align-items:center;">
-						<span style="font-size:16px; font-weight:600;">${s.Name}</span>
-						<span class="status-badge ${statusClass}"><span class="status-dot"></span>${statusLabel}</span>
+		card.innerHTML = `
+			<div>
+				<div style="display:flex; justify-content:space-between; align-items:center;">
+					<span style="font-size:16px; font-weight:600;">${s.name}</span>
+					<span class="status-badge ${statusClass}"><span class="status-dot"></span>${statusLabel}</span>
+				</div>
+				<div class="sched-meta">
+					<div class="meta-item">
+						<span class="meta-label">Folder Target</span>
+						<span class="meta-val"><code>${(s.folders || []).join(', ')}</code></span>
 					</div>
-					<div class="sched-meta">
-						<div class="meta-item">
-							<span class="meta-label">Folder Target</span>
-							<span class="meta-val"><code>${s.Folders.join(', ')}</code></span>
-						</div>
-						<div class="meta-item">
-							<span class="meta-label">Frekuensi</span>
-							<span class="meta-val">${cronLabel}</span>
-						</div>
+					<div class="meta-item">
+						<span class="meta-label">Frequency</span>
+						<span class="meta-val">${cronLabel}</span>
 					</div>
 				</div>
-				<div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border-subtle); padding-top:16px; margin-top:12px;">
-					<span style="font-size:12px; color:var(--text-tertiary)">Last: ${lastRunText} ${lastFilesText}</span>
-					<div style="display:flex; gap:8px;">
-						${s.Status === 'active' ?
-							`<button class="btn btn-secondary stop-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.Name}">Stop</button>` :
-							`<button class="btn btn-primary start-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.Name}">Start</button>`
-						}
-						<button class="btn btn-secondary logs-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.Name}">Logs</button>
-						<button class="btn btn-secondary edit-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.Name}">Edit</button>
-						<button class="btn btn-danger delete-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.Name}">Delete</button>
-					</div>
+			</div>
+			<div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border-subtle); padding-top:16px; margin-top:12px;">
+				<span style="font-size:12px; color:var(--text-tertiary)">Last: ${lastRunText} ${lastFilesText}</span>
+				<div style="display:flex; gap:8px;">
+					${s.status === 'active' ?
+						`<button class="btn btn-secondary stop-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.name}">Stop</button>` :
+						`<button class="btn btn-primary start-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.name}">Start</button>`
+					}
+					<button class="btn btn-secondary restart-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.name}">Restart</button>
+					<button class="btn btn-secondary logs-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.name}">Logs</button>
+					<button class="btn btn-secondary edit-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.name}">Edit</button>
+					<button class="btn btn-danger delete-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.name}">Delete</button>
 				</div>
-			`;
-			schedulesList.appendChild(card);
-		});
+			</div>
+		`;
+		schedulesList.appendChild(card);
+	});
 
-		document.querySelectorAll('.stop-btn').forEach(b => b.addEventListener('click', handleStop));
-		document.querySelectorAll('.start-btn').forEach(b => b.addEventListener('click', handleStart));
-		document.querySelectorAll('.logs-btn').forEach(b => b.addEventListener('click', handleLogs));
-		document.querySelectorAll('.edit-btn').forEach(b => b.addEventListener('click', handleEdit));
-		document.querySelectorAll('.delete-btn').forEach(b => b.addEventListener('click', handleDelete));
+	document.querySelectorAll('.stop-btn').forEach(b => b.addEventListener('click', handleStop));
+	document.querySelectorAll('.start-btn').forEach(b => b.addEventListener('click', handleStart));
+	document.querySelectorAll('.restart-btn').forEach(b => b.addEventListener('click', handleRestart));
+	document.querySelectorAll('.logs-btn').forEach(b => b.addEventListener('click', handleLogs));
+	document.querySelectorAll('.edit-btn').forEach(b => b.addEventListener('click', handleEdit));
+	document.querySelectorAll('.delete-btn').forEach(b => b.addEventListener('click', handleDelete));
+}
+
+async function loadDashboard() {
+	try {
+		// Load summary stats in parallel
+		const [schedules, rules, runs] = await Promise.all([
+			GetSchedules(),
+			GetVisualRules(),
+			GetHistory()
+		]);
+
+		// Summary cards
+		document.getElementById('stat-rules').textContent = (rules || []).length;
+		const activeCount = (schedules || []).filter(s => s.status === 'active').length;
+		document.getElementById('stat-schedules').textContent = activeCount;
+
+		document.getElementById('stat-last-run').textContent = getLastRunLabel(runs);
+		document.getElementById('stat-total-runs').textContent = getWeeklyRunsCount(runs);
+
+		renderSchedules(schedules);
 
 	} catch (err) {
-		schedulesList.innerHTML = `<div class="alert alert-danger">Error: ${err}</div>`;
+		document.getElementById('schedules-list').innerHTML = `<div class="alert alert-danger">Error: ${err}</div>`;
 	}
 }
 
@@ -215,6 +394,7 @@ addSchedBtn.addEventListener('click', () => {
 	schedOrigName.value = '';
 	schedForm.reset();
 	customCronGroup.classList.add('hidden');
+	updateBrowseBtn(schedFolder, browseSchedFolder);
 	schedModal.classList.add('active');
 });
 
@@ -226,19 +406,19 @@ schedForm.addEventListener('submit', async (e) => {
 	const name = schedName.value.trim();
 	const folderVal = schedFolder.value.trim();
 	const folders = folderVal.split(',').map(s => s.trim()).filter(s => s !== '');
-	
+
 	let cron = schedCron.value;
 	if (cron === 'custom') {
-		cron = schedCustomCron.value.trim();
+		cron = getCronFromFields();
 	}
 	const configPath = schedConfig.value.trim();
 
 	try {
 		await SaveSchedule(name, folders, cron, configPath);
 		schedModal.classList.remove('active');
-		loadSchedules();
+		loadDashboard();
 	} catch (err) {
-		alert(`Error saving schedule: ${err}`);
+		showAlert(`Error saving schedule: ${err}`);
 	}
 });
 
@@ -246,9 +426,9 @@ async function handleStart(e) {
 	const name = e.target.dataset.name;
 	try {
 		await StartSchedule(name);
-		loadSchedules();
+		loadDashboard();
 	} catch (err) {
-		alert(`Error starting: ${err}`);
+		showAlert(`Error starting: ${err}`);
 	}
 }
 
@@ -256,9 +436,26 @@ async function handleStop(e) {
 	const name = e.target.dataset.name;
 	try {
 		await StopSchedule(name);
-		loadSchedules();
+		loadDashboard();
 	} catch (err) {
-		alert(`Error stopping: ${err}`);
+		showAlert(`Error stopping: ${err}`);
+	}
+}
+
+async function handleRestart(e) {
+	const name = e.target.dataset.name;
+	const btn = e.target;
+	btn.disabled = true;
+	const origHtml = btn.innerHTML;
+	btn.innerHTML = '<span class="btn-spinner"></span> Restarting...';
+	try {
+		await RestartSchedule(name);
+		loadDashboard();
+	} catch (err) {
+		showAlert(`Error restarting: ${err}`);
+	} finally {
+		btn.disabled = false;
+		btn.innerHTML = origHtml;
 	}
 }
 
@@ -279,39 +476,41 @@ async function handleEdit(e) {
 	const name = e.target.dataset.name;
 	try {
 		const schedules = await GetSchedules();
-		const s = schedules.find(x => x.Name === name);
+		const s = schedules.find(x => x.name === name);
 		if (s) {
 			schedFormTitle.textContent = 'Edit Schedule';
-			schedOrigName.value = s.Name;
-			schedName.value = s.Name;
-			schedFolder.value = (s.Folders || []).join(', ');
-			schedConfig.value = s.Config || '';
-			
-			if (['0 * * * *', '0 0 * * *', '0 0 * * 0'].includes(s.Cron)) {
-				schedCron.value = s.Cron;
+			schedOrigName.value = s.name;
+			schedName.value = s.name;
+			schedFolder.value = (s.folders || []).join(', ');
+			schedConfig.value = s.config || '';
+
+			const presets = ['0 * * * *', '0 */6 * * *', '0 12 * * *', '0 0 * * *', '0 0 * * 0', '0 0 1 * *'];
+			if (presets.includes(s.cron)) {
+				schedCron.value = s.cron;
 				customCronGroup.classList.add('hidden');
 			} else {
 				schedCron.value = 'custom';
-				schedCustomCron.value = s.Cron;
 				customCronGroup.classList.remove('hidden');
+				setCronFields(s.cron);
 			}
+			updateBrowseBtn(schedFolder, browseSchedFolder);
 			schedModal.classList.add('active');
 		}
 	} catch (err) {
-		alert(`Error loading schedule for edit: ${err}`);
+		showAlert(`Error loading schedule for edit: ${err}`);
 	}
 }
 
 async function handleDelete(e) {
 	const name = e.target.dataset.name;
-	if (confirm(`Hapus schedule "${name}"?`)) {
+	showConfirmModal('Delete Schedule', `Delete schedule "${name}"? This will also stop the service.`, 'Delete', async () => {
 		try {
 			await DeleteSchedule(name);
-			loadSchedules();
+			loadDashboard();
 		} catch (err) {
-			alert(`Error deleting: ${err}`);
+			showAlert(`Error deleting: ${err}`);
 		}
-	}
+	});
 }
 
 // run manual
@@ -321,47 +520,55 @@ runDryBtn.addEventListener('click', () => triggerRun(true));
 async function triggerRun(dryRun) {
 	const folderVal = runFolder.value.trim();
 	if (!folderVal) {
-		alert('Silakan pilih folder target terlebih dahulu!');
+		showAlert('Please select a target folder first!');
 		return;
 	}
 
 	const folders = folderVal.split(',').map(s => s.trim()).filter(s => s !== '');
 	if (folders.length === 0) {
-		alert('Silakan masukkan folder target yang valid!');
+		showAlert('Please enter a valid target folder!');
 		return;
 	}
 
 	const btn = dryRun ? runDryBtn : runOrganizeBtn;
-	const origText = btn.textContent;
+	const origHtml = btn.innerHTML;
 	btn.disabled = true;
-	btn.textContent = 'Processing...';
+	btn.innerHTML = '<span class="btn-spinner"></span> Processing...';
 
 	try {
 		const results = await RunOrganize(folders, dryRun);
-		showResultsModal(results);
+		showResultsModal(results, dryRun);
 	} catch (err) {
-		alert(`Error running organizer: ${err}`);
+		showAlert(`Error running organizer: ${err}`);
 	} finally {
 		btn.disabled = false;
-		btn.textContent = origText;
+		btn.innerHTML = origHtml;
 	}
 }
 
-function showResultsModal(results) {
+function showResultsModal(results, dryRun) {
 	modalResultsRows.innerHTML = '';
 	if (!results || results.length === 0) {
-		modalResultsRows.innerHTML = '<tr><td colspan="4" style="text-align:center;">No files matches rules to organize.</td></tr>';
+		modalResultsRows.innerHTML = '<tr><td colspan="4" style="text-align:center;">No files match rules to organize.</td></tr>';
 	} else {
 		results.forEach(r => {
 			const tr = document.createElement('tr');
-			const statusLabel = r.skipped ? `Skipped: ${r.skip_reason}` : 'Success';
-			const statusClass = r.skipped ? 'text-secondary' : 'badge badge-success';
+			const isPreview = dryRun && !r.skipped;
+			let statusLabel = 'Success';
+			let statusClass = 'badge badge-success';
+			if (r.skipped) {
+				statusLabel = `Skipped: ${r.skip_reason}`;
+				statusClass = 'text-secondary';
+			} else if (isPreview) {
+				statusLabel = 'Preview';
+				statusClass = 'badge';
+			}
 
 			tr.innerHTML = `
 				<td><code>${r.source}</code></td>
 				<td><span class="badge">${r.action}</span></td>
 				<td><code>${r.destination || '-'}</code></td>
-				<td><span class="${r.skipped ? '' : statusClass}">${statusLabel}</span></td>
+				<td><span class="${statusClass}">${statusLabel}</span></td>
 			`;
 			modalResultsRows.appendChild(tr);
 		});
@@ -423,14 +630,14 @@ function renderRules() {
 					<span class="rule-field-label">Destination Folder</span>
 					<div class="picker-wrapper">
 						<input type="text" class="form-control dest-input" value="${rule.destination || ''}" readonly>
-						<button type="button" class="btn btn-secondary browse-dest-btn" data-idx="${idx}">📁 Browse</button>
+						<button type="button" class="btn btn-secondary browse-dest-btn" data-idx="${idx}">${ICONS.folder} Browse</button>
+						<button type="button" class="btn btn-danger remove-rule-btn" data-idx="${idx}">${ICONS.trash}</button>
 					</div>
 				</div>
-				<button type="button" class="btn btn-danger remove-rule-btn" data-idx="${idx}" style="padding: 10px;">&times;</button>
 			</div>
-			
+
 			<button type="button" class="rule-advanced-toggle" data-idx="${idx}">${toggleText}</button>
-			
+
 			<div class="rule-advanced-panel ${showAdv}">
 				<div class="rule-field">
 					<span class="rule-field-label">Filename Patterns (Glob, e.g. *Invoice*, *Report*)</span>
@@ -540,14 +747,16 @@ async function handleBrowseDest(e) {
 			renderRules();
 		}
 	} catch (err) {
-		alert(`Error selecting destination: ${err}`);
+		showAlert(`Error selecting destination: ${err}`);
 	}
 }
 
 function handleRemoveRule(e) {
-	const idx = Number(e.target.dataset.idx);
-	activeRules.splice(idx, 1);
-	renderRules();
+	const idx = Number(e.currentTarget.dataset.idx);
+	showConfirmModal('Delete Rule', `Remove rule #${idx + 1}? This will discard all its settings.`, 'Remove', () => {
+		activeRules.splice(idx, 1);
+		renderRules();
+	});
 }
 
 function handleToggleAdvanced(e) {
@@ -578,21 +787,34 @@ addRuleBtn.addEventListener('click', () => {
 	renderRules();
 });
 
-resetRulesBtn.addEventListener('click', loadRulesBuilder);
+resetRulesBtn.addEventListener('click', () => {
+	validationAlert.classList.add('hidden');
+	loadRulesBuilder();
+});
 
 saveRulesBtn.addEventListener('click', async () => {
-	try {
-		// client-side simple verification
-		for (const r of activeRules) {
-			if (!r.extensions || r.extensions.length === 0) {
-				alert('Setiap rule wajib memiliki minimal 1 file extension!');
-				return;
-			}
-			if (r.action === 'move' && !r.destination) {
-				alert('Destination folder wajib diisi jika action adalah "Move File"!');
-				return;
-			}
+	// client-side simple verification
+	for (const r of activeRules) {
+		const hasExt = r.extensions?.length > 0;
+		const hasPattern = r.filename_patterns?.length > 0;
+		const hasRegex = r.filename_regex?.length > 0;
+		const hasDest = r.action === 'delete' || r.destination?.trim();
+
+		if (!hasExt && !hasPattern && !hasRegex) {
+			showAlert('Each rule must have at least one match criteria: file extension, filename pattern, or filename regex.');
+			return;
 		}
+		if (!hasDest && r.action !== 'delete') {
+			showAlert('Destination folder is required when action is "Move File"!');
+			return;
+		}
+	}
+
+	let origHtml;
+	try {
+		origHtml = saveRulesBtn.innerHTML;
+		saveRulesBtn.disabled = true;
+		saveRulesBtn.innerHTML = '<span class="btn-spinner"></span> Saving...';
 
 		await SaveVisualRules(activeRules);
 		await SaveConflictStrategy(conflictStrategySelect.value);
@@ -604,6 +826,9 @@ saveRulesBtn.addEventListener('click', async () => {
 		validationAlert.className = 'alert alert-danger';
 		validationAlert.textContent = `Error: ${err}`;
 		validationAlert.classList.remove('hidden');
+	} finally {
+		saveRulesBtn.disabled = false;
+		saveRulesBtn.innerHTML = origHtml || 'Save Rules';
 	}
 });
 
@@ -612,60 +837,134 @@ async function loadHistory() {
 	try {
 		historyRows.innerHTML = '<tr><td colspan="4" style="text-align:center;">Loading history...</td></tr>';
 		const runs = await GetHistory();
+
+		historyRows.innerHTML = '';
+
 		if (!runs || runs.length === 0) {
 			historyRows.innerHTML = '<tr><td colspan="4" style="text-align:center;">No execution history found.</td></tr>';
 			return;
 		}
 
-		runs.sort((a, b) => b.ID - a.ID);
+		runs.sort((a, b) => (b.id || 0) - (a.id || 0));
 
-		historyRows.innerHTML = '';
 		runs.forEach(r => {
 			const tr = document.createElement('tr');
-			const d = new Date(r.Timestamp);
+			let dateStr = '\u2014';
+			const ts = r.timestamp;
+			if (ts) {
+				let d = new Date(ts);
+				if (Number.isNaN(d.getTime())) {
+					d = new Date(ts.replace(/(\.\d{3})\d+/, '$1'));
+				}
+				if (!Number.isNaN(d.getTime()) && d.getFullYear() > 2000) {
+					dateStr = d.toLocaleString();
+				}
+			}
 
-			const foldersText = r.Folders.join(', ');
-			const movedCount = r.Entries ? r.Entries.length : 0;
+			const foldersText = (r.folders || []).join(', ');
+			const entriesArr = r.entries || [];
+			const movedCount = entriesArr.filter(e => e.action === 'move' || !e.action).length;
 
 			tr.innerHTML = `
-				<td>${d.toLocaleString()}</td>
-				<td><code>${foldersText}</code></td>
+				<td>${dateStr}</td>
+				<td><code>${foldersText || '\u2014'}</code></td>
 				<td><span class="badge">${movedCount} items</span></td>
 				<td>
+					<div style="display:flex; gap:6px;">
 					${movedCount > 0 ?
-						`<button class="btn btn-secondary undo-btn" style="padding:4px 8px; font-size:11px;" data-id="${r.ID}">Undo</button>` :
+						`<button class="btn btn-secondary undo-btn" style="padding:4px 8px; font-size:11px;" data-id="${r.id}">Undo</button>` :
 						`<span style="color:var(--text-tertiary)">none</span>`
 					}
+					<button class="btn btn-danger delete-history-btn" style="padding:4px 8px; font-size:11px;" data-id="${r.id}">${ICONS.trash}</button>
+					</div>
 				</td>
 			`;
 			historyRows.appendChild(tr);
 		});
 
 		document.querySelectorAll('.undo-btn').forEach(b => b.addEventListener('click', handleUndo));
+		document.querySelectorAll('.delete-history-btn').forEach(b => b.addEventListener('click', handleDeleteHistory));
 
 	} catch (err) {
 		historyRows.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--danger)">Error: ${err}</td></tr>`;
 	}
 }
 
-async function handleUndo(e) {
-	const id = Number(e.target.dataset.id);
-	if (confirm(`Apakah Anda yakin ingin me-revert run #${id}? File-file akan dipindahkan kembali.`)) {
+async function handleDeleteHistory(e) {
+	const id = Number(e.currentTarget.dataset.id);
+	showConfirmModal('Delete History', `Delete history entry #${id}? This cannot be undone.`, 'Delete', async () => {
 		try {
-			e.target.disabled = true;
-			e.target.textContent = 'Undoing...';
-
-			const count = await UndoRun(id);
-			alert(`Berhasil mengembalikan ${count} file.`);
+			await DeleteHistoryRun(id);
 			loadHistory();
 		} catch (err) {
-			alert(`Error: ${err}`);
-		} finally {
-			e.target.disabled = false;
-			e.target.textContent = 'Undo';
+			showAlert(`Error deleting history: ${err}`);
 		}
-	}
+	});
 }
 
+async function handleUndo(e) {
+	const id = Number(e.target.dataset.id);
+	const btn = e.target;
+	const origHtml = btn.innerHTML;
+	showConfirmModal('Undo Run', `Are you sure you want to revert run #${id}? Files will be moved back to their original locations.`, 'Undo', async () => {
+		try {
+			btn.disabled = true;
+			btn.innerHTML = '<span class="btn-spinner"></span> Undoing...';
+
+			const count = await UndoRun(id);
+			showAlert(`Successfully restored ${count} file(s).`);
+			loadHistory();
+		} catch (err) {
+			showAlert(`Error: ${err}`);
+		} finally {
+			btn.disabled = false;
+			btn.innerHTML = origHtml;
+		}
+	}, 'btn btn-primary');
+}
+
+// Clear History handler
+document.getElementById('clear-history-btn').addEventListener('click', () => {
+	showConfirmModal('Clear History', 'Delete all history entries? This cannot be undone.', 'Clear All', async () => {
+		try {
+			await ClearHistory();
+			loadHistory();
+		} catch (err) {
+			showAlert(`Error clearing history: ${err}`);
+		}
+	}, 'btn btn-danger');
+});
+
+// Startup / Unstartup All handlers
+document.getElementById('startup-all-btn').addEventListener('click', async () => {
+	const schedules = await GetSchedules();
+	if (!schedules || schedules.length === 0) {
+		showAlert('No schedules to start. Click "+ Add Schedule" to create one first.');
+		return;
+	}
+	try {
+		await StartupAll();
+		loadDashboard();
+	} catch (err) {
+		showAlert(`Error starting all: ${err}`);
+	}
+});
+
+document.getElementById('unstartup-all-btn').addEventListener('click', async () => {
+	const schedules = await GetSchedules();
+	if (!schedules || schedules.length === 0) {
+		showAlert('No schedules configured. Click "+ Add Schedule" to create one first.');
+		return;
+	}
+	showConfirmModal('Stop All', 'Stop all running services?', 'Stop All', async () => {
+		try {
+			await UnstartupAll();
+			loadDashboard();
+		} catch (err) {
+			showAlert(`Error stopping all: ${err}`);
+		}
+	}, 'btn btn-primary');
+});
+
 // initial load
-loadSchedules();
+loadDashboard();

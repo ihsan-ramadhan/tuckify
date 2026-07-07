@@ -11,18 +11,55 @@
             <h1>tuckify</h1>
             <nav class="tabs">
                 <button class="tab active" data-tab="dashboard">Dashboard</button>
-                <button class="tab" data-tab="run-manual">Run Manual</button>
-                <button class="tab" data-tab="rules-builder">Rules Builder</button>
-                <button class="tab" data-tab="history">Run History</button>
+                <button class="tab" data-tab="run-manual">Run</button>
+                <button class="tab" data-tab="rules-builder">Rules</button>
+                <button class="tab" data-tab="history">History</button>
             </nav>
         </header>
 
         <main class="content">
             <!-- Dashboard / Schedules Tab -->
             <section id="dashboard" class="tab-panel active">
+                <!-- Summary Stats -->
+                <div class="summary-grid" id="summary-stats">
+                    <div class="summary-card">
+                        <span class="summary-icon">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                        </span>
+                        <div class="summary-stat" id="stat-rules">0</div>
+                        <div class="summary-label">Rules</div>
+                    </div>
+                    <div class="summary-card">
+                        <span class="summary-icon">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                        </span>
+                        <div class="summary-stat" id="stat-schedules">0</div>
+                        <div class="summary-label">Active Schedules</div>
+                    </div>
+                    <div class="summary-card">
+                        <span class="summary-icon">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                        </span>
+                        <div class="summary-stat" id="stat-last-run">--</div>
+                        <div class="summary-label">Last Run</div>
+                    </div>
+                    <div class="summary-card">
+                        <span class="summary-icon">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                        </span>
+                        <div class="summary-stat" id="stat-total-runs">0</div>
+                        <div class="summary-label">Runs This Week</div>
+                    </div>
+                </div>
+
+                <!-- Schedules Section -->
                 <div class="section-header">
-                    <h2>Active Schedules</h2>
-                    <button id="add-sched-btn" class="btn btn-primary">+ Add Schedule</button>
+                    <h2>Schedules</h2>
+                    <div style="display:flex; gap:8px;">
+                        <button id="startup-all-btn" class="btn btn-secondary">Start All</button>
+                        <button id="unstartup-all-btn" class="btn btn-secondary">Stop All</button>
+                        <button id="add-sched-btn" class="btn btn-primary">+ Add Schedule</button>
+                    </div>
                 </div>
 
                 <!-- Add/Edit Schedule Modal (Floating) -->
@@ -40,24 +77,33 @@
                                     <input type="text" id="sched-name" class="form-control" required placeholder="e.g. downloads-cleaner">
                                 </div>
                                 <div class="form-group">
-                                    <label for="sched-folder">Folders Target (dipisah koma untuk multi-folder)</label>
+                                    <label for="sched-folder">Target Folders</label>
                                     <div class="picker-wrapper">
-                                        <input type="text" id="sched-folder" class="form-control" required placeholder="Pilih folder target atau pisah dengan koma...">
-                                        <button type="button" id="browse-sched-folder" class="btn btn-secondary">📁 Browse...</button>
+                                        <input type="text" id="sched-folder" class="form-control" required placeholder="Select folders or separate with commas...">
+                                        <button type="button" id="browse-sched-folder" class="btn btn-secondary"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> Browse...</button>
                                     </div>
                                 </div>
                                 <div class="form-group">
                                     <label for="sched-cron">Frequency</label>
                                     <select id="sched-cron" class="form-control">
-                                        <option value="0 * * * *">Tiap Jam</option>
-                                        <option value="0 0 * * *">Tiap Hari (Tengah Malam)</option>
-                                        <option value="0 0 * * 0">Tiap Minggu</option>
-                                        <option value="custom">Kustom Cron Schedule</option>
+                                        <option value="0 * * * *">Every Hour</option>
+                                        <option value="0 */6 * * *">Every 6 Hours</option>
+                                        <option value="0 12 * * *">Daily at Noon</option>
+                                        <option value="0 0 * * *">Daily at Midnight</option>
+                                        <option value="0 0 * * 0">Every Week (Sunday)</option>
+                                        <option value="0 0 1 * *">Every Month (1st)</option>
+                                        <option value="custom">Custom...</option>
                                     </select>
                                 </div>
-                                <div id="custom-cron-group" class="form-group hidden">
-                                    <label for="sched-custom-cron">Custom Cron Expression</label>
-                                    <input type="text" id="sched-custom-cron" class="form-control" placeholder="e.g. 0 9 * * *">
+                                <div id="custom-cron-group" class="cron-builder hidden">
+                                    <span class="cron-builder-title" style="display: block; font-size: 13px; font-weight: 500; color: var(--text-secondary); margin-bottom: 8px;">Custom Cron Schedule</span>
+                                    <div class="cron-fields" id="cron-fields-container">
+                                        <!-- Generated by JS -->
+                                    </div>
+                                    <div class="cron-preview">
+                                        <span class="cron-preview-label">Cron expression:</span>
+                                        <code id="cron-preview-value">* * * * *</code>
+                                    </div>
                                 </div>
                                 <div class="form-group hidden">
                                     <label for="sched-config">Config Path</label>
@@ -84,15 +130,15 @@
                 </div>
                 <div class="card" style="max-width: 600px; margin: 0 auto;">
                     <div class="form-group">
-                        <label for="run-folder">Folders Target (dipisah koma untuk multi-folder)</label>
+                        <label for="run-folder">Target Folders</label>
                         <div class="picker-wrapper">
-                            <input type="text" id="run-folder" class="form-control" placeholder="Pilih folder target atau pisah dengan koma..." required>
-                            <button type="button" id="browse-run-folder" class="btn btn-secondary">📁 Browse...</button>
+                            <input type="text" id="run-folder" class="form-control" placeholder="Select folders or separate with commas..." required>
+                            <button type="button" id="browse-run-folder" class="btn btn-secondary"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> Browse...</button>
                         </div>
                     </div>
                     <div style="display:flex; gap:12px; margin-top:24px;">
-                        <button type="button" id="run-organize-btn" class="btn btn-primary" style="flex:1; justify-content:center;">▶ Run Organize</button>
-                        <button type="button" id="run-dry-btn" class="btn btn-secondary" style="flex:1; justify-content:center;">🔍 Dry Run</button>
+                        <button type="button" id="run-organize-btn" class="btn btn-primary" style="flex:1; justify-content:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run Organize</button>
+                        <button type="button" id="run-dry-btn" class="btn btn-secondary" style="flex:1; justify-content:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Dry Run</button>
                     </div>
                 </div>
             </section>
@@ -108,8 +154,11 @@
                     <div class="form-group" style="max-width: 350px; margin-bottom: 24px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 16px;">
                         <label for="conflict-strategy">Duplicate Conflict Strategy</label>
                         <select id="conflict-strategy" class="form-control">
-                            <option value="rename">Auto Rename (Add suffix _1, _2)</option>
-                            <option value="delete_duplicate">Delete Duplicate</option>
+                            <option value="rename">Auto Rename (add suffix _1, _2)</option>
+                            <option value="skip">Skip (leave existing file)</option>
+                            <option value="overwrite">Overwrite (replace existing file)</option>
+                            <option value="delete_duplicate">Delete Duplicate (remove source if identical)</option>
+                            <option value="ask">Ask (prompt each time)</option>
                         </select>
                     </div>
 
@@ -130,6 +179,7 @@
             <section id="history" class="tab-panel">
                 <div class="section-header">
                     <h2>Run History</h2>
+                    <button id="clear-history-btn" class="btn btn-danger" style="padding:6px 12px; font-size:12px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Clear All</button>
                 </div>
                 <div class="card">
                     <div class="table-wrapper">
@@ -174,6 +224,39 @@
                             <!-- dynamically loaded -->
                         </tbody>
                     </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirm-modal" class="modal">
+        <div class="modal-content" style="max-width: 420px;">
+            <div class="modal-header">
+                <h3 id="confirm-title">Confirm</h3>
+                <button id="close-confirm-modal" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="confirm-message" style="margin-bottom:24px; line-height:1.6;"></p>
+                <div style="display:flex; gap:12px; justify-content:flex-end;">
+                    <button id="confirm-cancel-btn" class="btn btn-secondary">Cancel</button>
+                    <button id="confirm-ok-btn" class="btn btn-danger">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert Modal -->
+    <div id="alert-modal" class="modal">
+        <div class="modal-content" style="max-width: 420px;">
+            <div class="modal-header">
+                <h3 id="alert-title">Notification</h3>
+                <button id="close-alert-modal" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="alert-message" style="margin-bottom:24px; line-height:1.6;"></p>
+                <div style="display:flex; gap:12px; justify-content:flex-end;">
+                    <button id="alert-ok-btn" class="btn btn-primary">Close</button>
                 </div>
             </div>
         </div>

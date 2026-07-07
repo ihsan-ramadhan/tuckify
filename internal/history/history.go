@@ -56,7 +56,7 @@ func Save(folders []string, entries []Entry) error {
 
 	newRun := Run{
 		ID:        nextID,
-		Timestamp: time.Now(),
+		Timestamp: time.Now().Truncate(time.Millisecond),
 		Folders:   folders,
 		Entries:   entries,
 	}
@@ -155,6 +155,23 @@ func revertEntry(e Entry) bool {
 		return false
 	}
 	return true
+}
+
+func Delete(id int) error {
+	p := filepath.Join(historyDir(), fmt.Sprintf("run_%d.json", id))
+	return os.Remove(p)
+}
+
+func ClearAll() error {
+	runs, err := LoadAll()
+	if err != nil {
+		return err
+	}
+	for _, r := range runs {
+		p := filepath.Join(historyDir(), fmt.Sprintf("run_%d.json", r.ID))
+		_ = os.Remove(p)
+	}
+	return nil
 }
 
 // Undo reverses a specific run by ID. If ID is 0, reverses the latest run.
