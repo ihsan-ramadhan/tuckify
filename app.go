@@ -279,6 +279,63 @@ func (a *App) DeleteSchedule(name string) error {
 	return err
 }
 
+func (a *App) RestartSchedule(name string) error {
+	schedules, err := store.Load()
+	if err != nil {
+		return err
+	}
+	var target *store.Schedule
+	for i := range schedules {
+		if schedules[i].Name == name {
+			target = &schedules[i]
+			break
+		}
+	}
+	if target == nil {
+		return fmt.Errorf("schedule %q not found", name)
+	}
+
+	srv, err := service.NewService()
+	if err != nil {
+		return err
+	}
+
+	// Stop first, then start
+	_ = srv.Uninstall(name)
+	return srv.Install(target.Name, target.GetFolders(), target.Cron, target.Config)
+}
+
+func (a *App) StartupAll() error {
+	schedules, err := store.Load()
+	if err != nil {
+		return err
+	}
+	if len(schedules) == 0 {
+		return nil
+	}
+
+	srv, err := service.NewService()
+	if err != nil {
+		return err
+	}
+
+	var lastErr error
+	for _, s := range schedules {
+		if err := srv.Install(s.Name, s.GetFolders(), s.Cron, s.Config); err != nil {
+			lastErr = err
+		}
+	}
+	return lastErr
+}
+
+func (a *App) UnstartupAll() error {
+	srv, err := service.NewService()
+	if err != nil {
+		return err
+	}
+	return srv.Uninstall("")
+}
+
 type runResult struct {
 	Source      string `json:"source"`
 	Destination string `json:"destination"`

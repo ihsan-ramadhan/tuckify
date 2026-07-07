@@ -3,6 +3,7 @@ import './app.css';
 
 import {
 	GetSchedules, SaveSchedule, StartSchedule, StopSchedule, DeleteSchedule,
+	StartupAll, UnstartupAll, RestartSchedule,
 	GetVisualRules, SaveVisualRules,
 	RunOrganize,
 	GetHistory, UndoRun,
@@ -72,7 +73,7 @@ tabs.forEach(btn => {
 		document.getElementById(target).classList.add('active');
 		currentTab = target;
 
-		if (target === 'dashboard') loadSchedules();
+		if (target === 'dashboard') loadDashboard();
 		if (target === 'rules-builder') loadRulesBuilder();
 		if (target === 'history') loadHistory();
 	});
@@ -129,12 +130,57 @@ schedCron.addEventListener('change', () => {
 });
 
 // schedules
-async function loadSchedules() {
+async function loadDashboard() {
 	try {
-		schedulesList.innerHTML = '<div class="loading">Loading schedules...</div>';
-		const schedules = await GetSchedules();
+		// Load summary stats in parallel
+		const [schedules, rules, runs] = await Promise.all([
+			GetSchedules(),
+			GetVisualRules(),
+			GetHistory()
+		]);
+
+		// Summary cards
+		document.getElementById('stat-rules').textContent = (rules || []).length;
+		const activeCount = (schedules || []).filter(s => s.Status === 'active').length;
+		document.getElementById('stat-schedules').textContent = activeCount;
+
+		// Last run - find the most recent valid run
+		let lastRunLabel = 'Never';
+		if (runs && runs.length > 0) {
+			for (let i = runs.length - 1; i >= 0; i--) {
+				const ts = runs[i].Timestamp;
+				if (ts && !ts.startsWith('0001')) {
+					const d = new Date(ts);
+					const now = new Date();
+					const diffMs = now - d;
+					if (!isNaN(diffMs) && diffMs >= 0) {
+						const diffMins = Math.floor(diffMs / 60000);
+						if (diffMins < 1) lastRunLabel = 'Just now';
+						else if (diffMins < 60) lastRunLabel = `${diffMins}m ago`;
+						else if (diffMins < 1440) lastRunLabel = `${Math.floor(diffMins / 60)}h ago`;
+						else lastRunLabel = `${Math.floor(diffMins / 1440)}d ago`;
+					}
+					break;
+				}
+			}
+		}
+		document.getElementById('stat-last-run').textContent = lastRunLabel;
+
+		// Runs this week
+		if (runs && runs.length > 0) {
+			const now = new Date();
+			const weekAgo = new Date(now);
+			weekAgo.setDate(weekAgo.getDate() - 7);
+			const weekCount = runs.filter(r => new Date(r.Timestamp) >= weekAgo).length;
+			document.getElementById('stat-total-runs').textContent = weekCount;
+		} else {
+			document.getElementById('stat-total-runs').textContent = '0';
+		}
+
+		// Schedule list
+		const schedulesList = document.getElementById('schedules-list');
 		if (!schedules || schedules.length === 0) {
-			schedulesList.innerHTML = '<div class="empty-state">No active schedules configured.</div>';
+			schedulesList.innerHTML = '<div class="empty-state">No schedules configured. Click "+ Add Schedule" to create one.</div>';
 			return;
 		}
 
@@ -155,15 +201,18 @@ async function loadSchedules() {
 			let lastFilesText = '';
 			if (s.LastFiles > 0) {
 				lastFilesText = `<span class="badge badge-success">${s.LastFiles} files organized</span>`;
-			} else if (s.LastFiles === 0 && !s.LastRun.startsWith('0001')) {
+			} else if (s.LastFiles === 0 && s.LastRun && !s.LastRun.startsWith('0001')) {
 				lastFilesText = '<span class="badge">0 files</span>';
 			}
 
 			// pretty format cron
 			let cronLabel = s.Cron;
-			if (s.Cron === '0 * * * *') cronLabel = 'Tiap Jam';
-			if (s.Cron === '0 0 * * *') cronLabel = 'Tiap Hari';
-			if (s.Cron === '0 0 * * 0') cronLabel = 'Tiap Minggu';
+			if (s.Cron === '0 * * * *') cronLabel = 'Every Hour';
+			else if (s.Cron === '0 */6 * * *') cronLabel = 'Every 6 Hours';
+			else if (s.Cron === '0 12 * * *') cronLabel = 'Daily at Noon';
+			else if (s.Cron === '0 0 * * *') cronLabel = 'Daily at Midnight';
+			else if (s.Cron === '0 0 * * 0') cronLabel = 'Weekly (Sunday)';
+			else if (s.Cron === '0 0 1 * *') cronLabel = 'Monthly (1st)';
 
 			card.innerHTML = `
 				<div>
@@ -174,10 +223,10 @@ async function loadSchedules() {
 					<div class="sched-meta">
 						<div class="meta-item">
 							<span class="meta-label">Folder Target</span>
-							<span class="meta-val"><code>${s.Folders.join(', ')}</code></span>
+							<span class="meta-val"><code>${(s.Folders || []).join(', ')}</code></span>
 						</div>
 						<div class="meta-item">
-							<span class="meta-label">Frekuensi</span>
+							<span class="meta-label">Frequency</span>
 							<span class="meta-val">${cronLabel}</span>
 						</div>
 					</div>
@@ -189,6 +238,7 @@ async function loadSchedules() {
 							`<button class="btn btn-secondary stop-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.Name}">Stop</button>` :
 							`<button class="btn btn-primary start-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.Name}">Start</button>`
 						}
+						<button class="btn btn-secondary restart-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.Name}">Restart</button>
 						<button class="btn btn-secondary logs-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.Name}">Logs</button>
 						<button class="btn btn-secondary edit-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.Name}">Edit</button>
 						<button class="btn btn-danger delete-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.Name}">Delete</button>
@@ -200,12 +250,13 @@ async function loadSchedules() {
 
 		document.querySelectorAll('.stop-btn').forEach(b => b.addEventListener('click', handleStop));
 		document.querySelectorAll('.start-btn').forEach(b => b.addEventListener('click', handleStart));
+		document.querySelectorAll('.restart-btn').forEach(b => b.addEventListener('click', handleRestart));
 		document.querySelectorAll('.logs-btn').forEach(b => b.addEventListener('click', handleLogs));
 		document.querySelectorAll('.edit-btn').forEach(b => b.addEventListener('click', handleEdit));
 		document.querySelectorAll('.delete-btn').forEach(b => b.addEventListener('click', handleDelete));
 
 	} catch (err) {
-		schedulesList.innerHTML = `<div class="alert alert-danger">Error: ${err}</div>`;
+		document.getElementById('schedules-list').innerHTML = `<div class="alert alert-danger">Error: ${err}</div>`;
 	}
 }
 
@@ -236,7 +287,7 @@ schedForm.addEventListener('submit', async (e) => {
 	try {
 		await SaveSchedule(name, folders, cron, configPath);
 		schedModal.classList.remove('active');
-		loadSchedules();
+		loadDashboard();
 	} catch (err) {
 		alert(`Error saving schedule: ${err}`);
 	}
@@ -246,7 +297,7 @@ async function handleStart(e) {
 	const name = e.target.dataset.name;
 	try {
 		await StartSchedule(name);
-		loadSchedules();
+		loadDashboard();
 	} catch (err) {
 		alert(`Error starting: ${err}`);
 	}
@@ -256,9 +307,26 @@ async function handleStop(e) {
 	const name = e.target.dataset.name;
 	try {
 		await StopSchedule(name);
-		loadSchedules();
+		loadDashboard();
 	} catch (err) {
 		alert(`Error stopping: ${err}`);
+	}
+}
+
+async function handleRestart(e) {
+	const name = e.target.dataset.name;
+	const btn = e.target;
+	btn.disabled = true;
+	const origText = btn.textContent;
+	btn.textContent = 'Restarting...';
+	try {
+		await RestartSchedule(name);
+		loadDashboard();
+	} catch (err) {
+		alert(`Error restarting: ${err}`);
+	} finally {
+		btn.disabled = false;
+		btn.textContent = origText;
 	}
 }
 
@@ -304,10 +372,10 @@ async function handleEdit(e) {
 
 async function handleDelete(e) {
 	const name = e.target.dataset.name;
-	if (confirm(`Hapus schedule "${name}"?`)) {
+	if (confirm(`Delete schedule "${name}"?`)) {
 		try {
 			await DeleteSchedule(name);
-			loadSchedules();
+			loadDashboard();
 		} catch (err) {
 			alert(`Error deleting: ${err}`);
 		}
@@ -667,5 +735,26 @@ async function handleUndo(e) {
 	}
 }
 
+// Startup / Unstartup All handlers
+document.getElementById('startup-all-btn').addEventListener('click', async () => {
+	try {
+		await StartupAll();
+		loadDashboard();
+	} catch (err) {
+		alert(`Error starting all: ${err}`);
+	}
+});
+
+document.getElementById('unstartup-all-btn').addEventListener('click', async () => {
+	if (confirm('Stop all running services?')) {
+		try {
+			await UnstartupAll();
+			loadDashboard();
+		} catch (err) {
+			alert(`Error stopping all: ${err}`);
+		}
+	}
+});
+
 // initial load
-loadSchedules();
+loadDashboard();

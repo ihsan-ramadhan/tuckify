@@ -214,6 +214,55 @@ body {
 	cursor: not-allowed;
 }
 
+/* Summary Stats Grid */
+.summary-grid {
+	display: grid;
+	grid-template-columns: repeat(4, 1fr);
+	gap: 16px;
+	margin-bottom: 32px;
+}
+
+.summary-card {
+	background: rgba(255, 255, 255, 0.02);
+	border: 1px solid var(--border-standard);
+	border-radius: 12px;
+	padding: 20px;
+	text-align: center;
+	transition: all 0.2s ease;
+}
+
+.summary-card:hover {
+	background: rgba(255, 255, 255, 0.04);
+	border-color: rgba(255, 255, 255, 0.12);
+}
+
+.summary-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 36px;
+	height: 36px;
+	border-radius: 8px;
+	background: rgba(94, 106, 210, 0.12);
+	color: var(--accent-violet);
+	margin-bottom: 12px;
+}
+
+.summary-stat {
+	font-size: 28px;
+	font-weight: 600;
+	color: var(--text-primary);
+	letter-spacing: -0.5px;
+}
+
+.summary-label {
+	font-size: 12px;
+	color: var(--text-tertiary);
+	margin-top: 4px;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+}
+
 /* Schedules Grid */
 .schedules-grid {
 	display: grid;
