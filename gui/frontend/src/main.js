@@ -179,7 +179,6 @@ function buildCronFieldOptions() {
 	const hourOpts = ['*', ...Array.from({length: 24}, (_, i) => String(i))];
 	const dayOpts = ['*', ...Array.from({length: 31}, (_, i) => String(i + 1))];
 	const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-	const weekdayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
 	const fields = [
 		{ key: 'min', label: 'Minute', opts: minuteOpts },
@@ -244,6 +243,127 @@ schedCron.addEventListener('change', () => {
 });
 
 // schedules
+function getLastRunLabel(runs) {
+	if (!runs || runs.length === 0) return 'Never';
+	for (let i = runs.length - 1; i >= 0; i--) {
+		const ts = runs[i].timestamp;
+		if (!ts) continue;
+		let d = new Date(ts);
+		if (Number.isNaN(d.getTime())) {
+			d = new Date(ts.replace(/(\.\d{3})\d+/, '$1'));
+		}
+		if (!Number.isNaN(d.getTime()) && d.getFullYear() > 2000) {
+			const now = new Date();
+			const diffMs = now - d;
+			if (!Number.isNaN(diffMs) && diffMs >= 0) {
+				const diffMins = Math.floor(diffMs / 60000);
+				if (diffMins < 1) return 'Just now';
+				if (diffMins < 60) return `${diffMins}m ago`;
+				if (diffMins < 1440) return `${Math.floor(diffMins / 60)}h ago`;
+				return `${Math.floor(diffMins / 1440)}d ago`;
+			}
+			break;
+		}
+	}
+	return 'Never';
+}
+
+function getWeeklyRunsCount(runs) {
+	if (!runs || runs.length === 0) return 0;
+	const now = new Date();
+	const weekAgo = new Date(now);
+	weekAgo.setDate(weekAgo.getDate() - 7);
+	return runs.filter(r => {
+		if (!r.timestamp) return false;
+		const d = new Date(r.timestamp);
+		return !Number.isNaN(d.getTime()) && d >= weekAgo;
+	}).length;
+}
+
+function renderSchedules(schedules) {
+	const schedulesList = document.getElementById('schedules-list');
+	if (!schedules || schedules.length === 0) {
+		schedulesList.innerHTML = '<div class="empty-state">No schedules configured. Click "+ Add Schedule" to create one.</div>';
+		return;
+	}
+
+	schedulesList.innerHTML = '';
+	schedules.forEach(s => {
+		const card = document.createElement('div');
+		card.className = 'card sched-card';
+
+		const statusClass = s.status === 'active' ? '' : 'inactive';
+		const statusLabel = s.status === 'active' ? 'Running' : 'Stopped';
+
+		let lastRunText = 'never';
+		if (s.last_run) {
+			const d = new Date(s.last_run);
+			if (!Number.isNaN(d.getTime()) && d.getFullYear() > 1) {
+				lastRunText = d.toLocaleString();
+			}
+		}
+
+		let lastFilesText = '';
+		if (s.last_files > 0) {
+			lastFilesText = `<span class="badge badge-success">${s.last_files} files organized</span>`;
+		} else if (s.last_files === 0 && s.last_run) {
+			const d = new Date(s.last_run);
+			if (!Number.isNaN(d.getTime()) && d.getFullYear() > 1) {
+				lastFilesText = '<span class="badge">0 files</span>';
+			}
+		}
+
+		// pretty format cron
+		let cronLabel = s.cron;
+		if (s.cron === '0 * * * *') cronLabel = 'Every Hour';
+		else if (s.cron === '0 */6 * * *') cronLabel = 'Every 6 Hours';
+		else if (s.cron === '0 12 * * *') cronLabel = 'Daily at Noon';
+		else if (s.cron === '0 0 * * *') cronLabel = 'Daily at Midnight';
+		else if (s.cron === '0 0 * * 0') cronLabel = 'Weekly (Sunday)';
+		else if (s.cron === '0 0 1 * *') cronLabel = 'Monthly (1st)';
+
+		card.innerHTML = `
+			<div>
+				<div style="display:flex; justify-content:space-between; align-items:center;">
+					<span style="font-size:16px; font-weight:600;">${s.name}</span>
+					<span class="status-badge ${statusClass}"><span class="status-dot"></span>${statusLabel}</span>
+				</div>
+				<div class="sched-meta">
+					<div class="meta-item">
+						<span class="meta-label">Folder Target</span>
+						<span class="meta-val"><code>${(s.folders || []).join(', ')}</code></span>
+					</div>
+					<div class="meta-item">
+						<span class="meta-label">Frequency</span>
+						<span class="meta-val">${cronLabel}</span>
+					</div>
+				</div>
+			</div>
+			<div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border-subtle); padding-top:16px; margin-top:12px;">
+				<span style="font-size:12px; color:var(--text-tertiary)">Last: ${lastRunText} ${lastFilesText}</span>
+				<div style="display:flex; gap:8px;">
+					${s.status === 'active' ?
+						`<button class="btn btn-secondary stop-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.name}">Stop</button>` :
+						`<button class="btn btn-primary start-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.name}">Start</button>`
+					}
+					<button class="btn btn-secondary restart-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.name}">Restart</button>
+					<button class="btn btn-secondary logs-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.name}">Logs</button>
+					<button class="btn btn-secondary edit-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.name}">Edit</button>
+					<button class="btn btn-danger delete-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.name}">Delete</button>
+				</div>
+			</div>
+		`;
+		schedulesList.appendChild(card);
+	});
+
+	document.querySelectorAll('.stop-btn').forEach(b => b.addEventListener('click', handleStop));
+	document.querySelectorAll('.start-btn').forEach(b => b.addEventListener('click', handleStart));
+	document.querySelectorAll('.restart-btn').forEach(b => b.addEventListener('click', handleRestart));
+	document.querySelectorAll('.logs-btn').forEach(b => b.addEventListener('click', handleLogs));
+	document.querySelectorAll('.edit-btn').forEach(b => b.addEventListener('click', handleEdit));
+	document.querySelectorAll('.delete-btn').forEach(b => b.addEventListener('click', handleDelete));
+}
+
 async function loadDashboard() {
 	try {
 		// Load summary stats in parallel
@@ -258,130 +378,10 @@ async function loadDashboard() {
 		const activeCount = (schedules || []).filter(s => s.status === 'active').length;
 		document.getElementById('stat-schedules').textContent = activeCount;
 
-		// Last run - find the most recent valid run
-		let lastRunLabel = 'Never';
-		if (runs && runs.length > 0) {
-			for (let i = runs.length - 1; i >= 0; i--) {
-				const ts = runs[i].timestamp;
-				if (ts) {
-					let d = new Date(ts);
-					if (isNaN(d.getTime())) {
-						d = new Date(ts.replace(/(\.\d{3})\d+/, '$1'));
-					}
-					if (!isNaN(d.getTime()) && d.getFullYear() > 2000) {
-						const now = new Date();
-						const diffMs = now - d;
-						if (!isNaN(diffMs) && diffMs >= 0) {
-							const diffMins = Math.floor(diffMs / 60000);
-							if (diffMins < 1) lastRunLabel = 'Just now';
-							else if (diffMins < 60) lastRunLabel = `${diffMins}m ago`;
-							else if (diffMins < 1440) lastRunLabel = `${Math.floor(diffMins / 60)}h ago`;
-							else lastRunLabel = `${Math.floor(diffMins / 1440)}d ago`;
-						}
-						break;
-					}
-				}
-			}
-		}
-		document.getElementById('stat-last-run').textContent = lastRunLabel;
+		document.getElementById('stat-last-run').textContent = getLastRunLabel(runs);
+		document.getElementById('stat-total-runs').textContent = getWeeklyRunsCount(runs);
 
-		// Runs this week
-		if (runs && runs.length > 0) {
-			const now = new Date();
-			const weekAgo = new Date(now);
-			weekAgo.setDate(weekAgo.getDate() - 7);
-			const weekCount = runs.filter(r => {
-				if (!r.timestamp) return false;
-				const d = new Date(r.timestamp);
-				return !isNaN(d.getTime()) && d >= weekAgo;
-			}).length;
-			document.getElementById('stat-total-runs').textContent = weekCount;
-		} else {
-			document.getElementById('stat-total-runs').textContent = '0';
-		}
-
-		// Schedule list
-		const schedulesList = document.getElementById('schedules-list');
-		if (!schedules || schedules.length === 0) {
-			schedulesList.innerHTML = '<div class="empty-state">No schedules configured. Click "+ Add Schedule" to create one.</div>';
-			return;
-		}
-
-		schedulesList.innerHTML = '';
-		schedules.forEach(s => {
-			const card = document.createElement('div');
-			card.className = 'card sched-card';
-
-			const statusClass = s.status === 'active' ? '' : 'inactive';
-			const statusLabel = s.status === 'active' ? 'Running' : 'Stopped';
-
-			let lastRunText = 'never';
-			if (s.last_run) {
-				const d = new Date(s.last_run);
-				if (!isNaN(d.getTime()) && d.getFullYear() > 1) {
-					lastRunText = d.toLocaleString();
-				}
-			}
-
-			let lastFilesText = '';
-			if (s.last_files > 0) {
-				lastFilesText = `<span class="badge badge-success">${s.last_files} files organized</span>`;
-			} else if (s.last_files === 0 && s.last_run) {
-				const d = new Date(s.last_run);
-				if (!isNaN(d.getTime()) && d.getFullYear() > 1) {
-					lastFilesText = '<span class="badge">0 files</span>';
-				}
-			}
-
-			// pretty format cron
-			let cronLabel = s.cron;
-			if (s.cron === '0 * * * *') cronLabel = 'Every Hour';
-			else if (s.cron === '0 */6 * * *') cronLabel = 'Every 6 Hours';
-			else if (s.cron === '0 12 * * *') cronLabel = 'Daily at Noon';
-			else if (s.cron === '0 0 * * *') cronLabel = 'Daily at Midnight';
-			else if (s.cron === '0 0 * * 0') cronLabel = 'Weekly (Sunday)';
-			else if (s.cron === '0 0 1 * *') cronLabel = 'Monthly (1st)';
-
-			card.innerHTML = `
-				<div>
-					<div style="display:flex; justify-content:space-between; align-items:center;">
-						<span style="font-size:16px; font-weight:600;">${s.name}</span>
-						<span class="status-badge ${statusClass}"><span class="status-dot"></span>${statusLabel}</span>
-					</div>
-					<div class="sched-meta">
-						<div class="meta-item">
-							<span class="meta-label">Folder Target</span>
-							<span class="meta-val"><code>${(s.folders || []).join(', ')}</code></span>
-						</div>
-						<div class="meta-item">
-							<span class="meta-label">Frequency</span>
-							<span class="meta-val">${cronLabel}</span>
-						</div>
-					</div>
-				</div>
-				<div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border-subtle); padding-top:16px; margin-top:12px;">
-					<span style="font-size:12px; color:var(--text-tertiary)">Last: ${lastRunText} ${lastFilesText}</span>
-					<div style="display:flex; gap:8px;">
-						${s.status === 'active' ?
-							`<button class="btn btn-secondary stop-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.name}">Stop</button>` :
-							`<button class="btn btn-primary start-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.name}">Start</button>`
-						}
-						<button class="btn btn-secondary restart-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.name}">Restart</button>
-						<button class="btn btn-secondary logs-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.name}">Logs</button>
-						<button class="btn btn-secondary edit-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.name}">Edit</button>
-						<button class="btn btn-danger delete-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.name}">Delete</button>
-					</div>
-				</div>
-			`;
-			schedulesList.appendChild(card);
-		});
-
-		document.querySelectorAll('.stop-btn').forEach(b => b.addEventListener('click', handleStop));
-		document.querySelectorAll('.start-btn').forEach(b => b.addEventListener('click', handleStart));
-		document.querySelectorAll('.restart-btn').forEach(b => b.addEventListener('click', handleRestart));
-		document.querySelectorAll('.logs-btn').forEach(b => b.addEventListener('click', handleLogs));
-		document.querySelectorAll('.edit-btn').forEach(b => b.addEventListener('click', handleEdit));
-		document.querySelectorAll('.delete-btn').forEach(b => b.addEventListener('click', handleDelete));
+		renderSchedules(schedules);
 
 	} catch (err) {
 		document.getElementById('schedules-list').innerHTML = `<div class="alert alert-danger">Error: ${err}</div>`;
@@ -554,8 +554,15 @@ function showResultsModal(results, dryRun) {
 		results.forEach(r => {
 			const tr = document.createElement('tr');
 			const isPreview = dryRun && !r.skipped;
-			const statusLabel = r.skipped ? `Skipped: ${r.skip_reason}` : (isPreview ? 'Preview' : 'Success');
-			const statusClass = r.skipped ? 'text-secondary' : (isPreview ? 'badge' : 'badge badge-success');
+			let statusLabel = 'Success';
+			let statusClass = 'badge badge-success';
+			if (r.skipped) {
+				statusLabel = `Skipped: ${r.skip_reason}`;
+				statusClass = 'text-secondary';
+			} else if (isPreview) {
+				statusLabel = 'Preview';
+				statusClass = 'badge';
+			}
 
 			tr.innerHTML = `
 				<td><code>${r.source}</code></td>
@@ -788,10 +795,10 @@ resetRulesBtn.addEventListener('click', () => {
 saveRulesBtn.addEventListener('click', async () => {
 	// client-side simple verification
 	for (const r of activeRules) {
-		const hasExt = r.extensions && r.extensions.length > 0;
-		const hasPattern = r.filename_patterns && r.filename_patterns.length > 0;
-		const hasRegex = r.filename_regex && r.filename_regex.length > 0;
-		const hasDest = r.action === 'delete' || (r.destination && r.destination.trim());
+		const hasExt = r.extensions?.length > 0;
+		const hasPattern = r.filename_patterns?.length > 0;
+		const hasRegex = r.filename_regex?.length > 0;
+		const hasDest = r.action === 'delete' || r.destination?.trim();
 
 		if (!hasExt && !hasPattern && !hasRegex) {
 			showAlert('Each rule must have at least one match criteria: file extension, filename pattern, or filename regex.');
@@ -846,10 +853,10 @@ async function loadHistory() {
 			const ts = r.timestamp;
 			if (ts) {
 				let d = new Date(ts);
-				if (isNaN(d.getTime())) {
+				if (Number.isNaN(d.getTime())) {
 					d = new Date(ts.replace(/(\.\d{3})\d+/, '$1'));
 				}
-				if (!isNaN(d.getTime()) && d.getFullYear() > 2000) {
+				if (!Number.isNaN(d.getTime()) && d.getFullYear() > 2000) {
 					dateStr = d.toLocaleString();
 				}
 			}
