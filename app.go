@@ -44,6 +44,10 @@ type RuleView struct {
 	FilenameRegex    []string `json:"filename_regex"`
 	Destination      string   `json:"destination"`
 	Action           string   `json:"action"`
+	MinSize          string   `json:"min_size"`
+	MaxSize          string   `json:"max_size"`
+	MinAge           string   `json:"min_age"`
+	MaxAge           string   `json:"max_age"`
 }
 
 func (a *App) GetVisualRules() ([]RuleView, error) {
@@ -68,6 +72,10 @@ func (a *App) GetVisualRules() ([]RuleView, error) {
 			FilenameRegex:    r.FilenameRegex,
 			Destination:      r.Destination,
 			Action:           action,
+			MinSize:          r.MinSize,
+			MaxSize:          r.MaxSize,
+			MinAge:           r.MinAge,
+			MaxAge:           r.MaxAge,
 		})
 	}
 	return views, nil
@@ -93,6 +101,10 @@ func (a *App) SaveVisualRules(rules []RuleView) error {
 			FilenameRegex:    r.FilenameRegex,
 			Destination:      r.Destination,
 			Action:           r.Action,
+			MinSize:          r.MinSize,
+			MaxSize:          r.MaxSize,
+			MinAge:           r.MinAge,
+			MaxAge:           r.MaxAge,
 		})
 	}
 

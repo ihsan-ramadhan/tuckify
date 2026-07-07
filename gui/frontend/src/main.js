@@ -239,7 +239,7 @@ async function loadDashboard() {
 
 		// Summary cards
 		document.getElementById('stat-rules').textContent = (rules || []).length;
-		const activeCount = (schedules || []).filter(s => s.Status === 'active').length;
+		const activeCount = (schedules || []).filter(s => s.status === 'active').length;
 		document.getElementById('stat-schedules').textContent = activeCount;
 
 		// Last run - find the most recent valid run
@@ -296,46 +296,46 @@ async function loadDashboard() {
 			const card = document.createElement('div');
 			card.className = 'card sched-card';
 
-			const statusClass = s.Status === 'active' ? '' : 'inactive';
-			const statusLabel = s.Status === 'active' ? 'Running' : 'Stopped';
+			const statusClass = s.status === 'active' ? '' : 'inactive';
+			const statusLabel = s.status === 'active' ? 'Running' : 'Stopped';
 
 			let lastRunText = 'never';
-			if (s.LastRun) {
-				const d = new Date(s.LastRun);
+			if (s.last_run) {
+				const d = new Date(s.last_run);
 				if (!isNaN(d.getTime()) && d.getFullYear() > 1) {
 					lastRunText = d.toLocaleString();
 				}
 			}
 
 			let lastFilesText = '';
-			if (s.LastFiles > 0) {
-				lastFilesText = `<span class="badge badge-success">${s.LastFiles} files organized</span>`;
-			} else if (s.LastFiles === 0 && s.LastRun) {
-				const d = new Date(s.LastRun);
+			if (s.last_files > 0) {
+				lastFilesText = `<span class="badge badge-success">${s.last_files} files organized</span>`;
+			} else if (s.last_files === 0 && s.last_run) {
+				const d = new Date(s.last_run);
 				if (!isNaN(d.getTime()) && d.getFullYear() > 1) {
 					lastFilesText = '<span class="badge">0 files</span>';
 				}
 			}
 
 			// pretty format cron
-			let cronLabel = s.Cron;
-			if (s.Cron === '0 * * * *') cronLabel = 'Every Hour';
-			else if (s.Cron === '0 */6 * * *') cronLabel = 'Every 6 Hours';
-			else if (s.Cron === '0 12 * * *') cronLabel = 'Daily at Noon';
-			else if (s.Cron === '0 0 * * *') cronLabel = 'Daily at Midnight';
-			else if (s.Cron === '0 0 * * 0') cronLabel = 'Weekly (Sunday)';
-			else if (s.Cron === '0 0 1 * *') cronLabel = 'Monthly (1st)';
+			let cronLabel = s.cron;
+			if (s.cron === '0 * * * *') cronLabel = 'Every Hour';
+			else if (s.cron === '0 */6 * * *') cronLabel = 'Every 6 Hours';
+			else if (s.cron === '0 12 * * *') cronLabel = 'Daily at Noon';
+			else if (s.cron === '0 0 * * *') cronLabel = 'Daily at Midnight';
+			else if (s.cron === '0 0 * * 0') cronLabel = 'Weekly (Sunday)';
+			else if (s.cron === '0 0 1 * *') cronLabel = 'Monthly (1st)';
 
 			card.innerHTML = `
 				<div>
 					<div style="display:flex; justify-content:space-between; align-items:center;">
-						<span style="font-size:16px; font-weight:600;">${s.Name}</span>
+						<span style="font-size:16px; font-weight:600;">${s.name}</span>
 						<span class="status-badge ${statusClass}"><span class="status-dot"></span>${statusLabel}</span>
 					</div>
 					<div class="sched-meta">
 						<div class="meta-item">
 							<span class="meta-label">Folder Target</span>
-							<span class="meta-val"><code>${(s.Folders || []).join(', ')}</code></span>
+							<span class="meta-val"><code>${(s.folders || []).join(', ')}</code></span>
 						</div>
 						<div class="meta-item">
 							<span class="meta-label">Frequency</span>
@@ -346,14 +346,14 @@ async function loadDashboard() {
 				<div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border-subtle); padding-top:16px; margin-top:12px;">
 					<span style="font-size:12px; color:var(--text-tertiary)">Last: ${lastRunText} ${lastFilesText}</span>
 					<div style="display:flex; gap:8px;">
-						${s.Status === 'active' ?
-							`<button class="btn btn-secondary stop-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.Name}">Stop</button>` :
-							`<button class="btn btn-primary start-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.Name}">Start</button>`
+						${s.status === 'active' ?
+							`<button class="btn btn-secondary stop-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.name}">Stop</button>` :
+							`<button class="btn btn-primary start-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.name}">Start</button>`
 						}
-						<button class="btn btn-secondary restart-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.Name}">Restart</button>
-						<button class="btn btn-secondary logs-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.Name}">Logs</button>
-						<button class="btn btn-secondary edit-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.Name}">Edit</button>
-						<button class="btn btn-danger delete-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.Name}">Delete</button>
+						<button class="btn btn-secondary restart-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.name}">Restart</button>
+						<button class="btn btn-secondary logs-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.name}">Logs</button>
+						<button class="btn btn-secondary edit-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.name}">Edit</button>
+						<button class="btn btn-danger delete-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.name}">Delete</button>
 					</div>
 				</div>
 			`;
@@ -460,22 +460,22 @@ async function handleEdit(e) {
 	const name = e.target.dataset.name;
 	try {
 		const schedules = await GetSchedules();
-		const s = schedules.find(x => x.Name === name);
+		const s = schedules.find(x => x.name === name);
 		if (s) {
 			schedFormTitle.textContent = 'Edit Schedule';
-			schedOrigName.value = s.Name;
-			schedName.value = s.Name;
-			schedFolder.value = (s.Folders || []).join(', ');
-			schedConfig.value = s.Config || '';
+			schedOrigName.value = s.name;
+			schedName.value = s.name;
+			schedFolder.value = (s.folders || []).join(', ');
+			schedConfig.value = s.config || '';
 
 			const presets = ['0 * * * *', '0 */6 * * *', '0 12 * * *', '0 0 * * *', '0 0 * * 0', '0 0 1 * *'];
-			if (presets.includes(s.Cron)) {
-				schedCron.value = s.Cron;
+			if (presets.includes(s.cron)) {
+				schedCron.value = s.cron;
 				customCronGroup.classList.add('hidden');
 			} else {
 				schedCron.value = 'custom';
 				customCronGroup.classList.remove('hidden');
-				setCronFields(s.Cron);
+				setCronFields(s.cron);
 			}
 			updateBrowseBtn(schedFolder, browseSchedFolder);
 			schedModal.classList.add('active');
