@@ -33,7 +33,7 @@ const schedFolder = document.getElementById('sched-folder');
 const browseSchedFolder = document.getElementById('browse-sched-folder');
 const schedCron = document.getElementById('sched-cron');
 const customCronGroup = document.getElementById('custom-cron-group');
-const schedCustomCron = document.getElementById('sched-custom-cron');
+const cronFieldsContainer = document.getElementById('cron-fields-container');
 const schedConfig = document.getElementById('sched-config');
 
 // Run Manual
@@ -120,10 +120,71 @@ browseRunFolder.addEventListener('click', async () => {
 	}
 });
 
+// Generate custom cron field dropdowns
+function buildCronFieldOptions() {
+	const minuteOpts = ['*', '0', '5', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55'];
+	const hourOpts = ['*', ...Array.from({length: 24}, (_, i) => String(i))];
+	const dayOpts = ['*', ...Array.from({length: 31}, (_, i) => String(i + 1))];
+	const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+	const weekdayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+	const fields = [
+		{ key: 'min', label: 'Minute', opts: minuteOpts },
+		{ key: 'hour', label: 'Hour', opts: hourOpts },
+		{ key: 'day', label: 'Day', opts: dayOpts },
+		{ key: 'month', label: 'Month', opts: ['*', ...Array.from({length: 12}, (_, i) => String(i + 1))], labels: ['*', ...monthNames] },
+		{ key: 'weekday', label: 'Weekday', opts: ['*', '0','1','2','3','4','5','6'], labels: ['Every','Sun','Mon','Tue','Wed','Thu','Fri','Sat'] },
+	];
+
+	cronFieldsContainer.innerHTML = fields.map(f => `
+		<div class="cron-field">
+			<label>${f.label}</label>
+			<select class="form-control cron-${f.key}">
+				${f.opts.map((o, i) => `<option value="${o}">${(f.labels || f.opts)[i]}</option>`).join('')}
+			</select>
+		</div>
+	`).join('');
+
+	// Update preview on any change
+	cronFieldsContainer.querySelectorAll('select').forEach(s => {
+		s.addEventListener('change', updateCronPreview);
+	});
+}
+
+function getCronFromFields() {
+	const min = document.querySelector('.cron-min')?.value || '*';
+	const hour = document.querySelector('.cron-hour')?.value || '*';
+	const day = document.querySelector('.cron-day')?.value || '*';
+	const month = document.querySelector('.cron-month')?.value || '*';
+	const weekday = document.querySelector('.cron-weekday')?.value || '*';
+	return `${min} ${hour} ${day} ${month} ${weekday}`;
+}
+
+function setCronFields(cronExpr) {
+	const parts = (cronExpr || '* * * * *').split(' ');
+	const setVal = (sel, val) => {
+		const el = document.querySelector(sel);
+		if (el) el.value = val;
+	};
+	setVal('.cron-min', parts[0] || '*');
+	setVal('.cron-hour', parts[1] || '*');
+	setVal('.cron-day', parts[2] || '*');
+	setVal('.cron-month', parts[3] || '*');
+	setVal('.cron-weekday', parts[4] || '*');
+	updateCronPreview();
+}
+
+function updateCronPreview() {
+	document.getElementById('cron-preview-value').textContent = getCronFromFields();
+}
+
+buildCronFieldOptions();
+
 // cron option change helper
 schedCron.addEventListener('change', () => {
 	if (schedCron.value === 'custom') {
 		customCronGroup.classList.remove('hidden');
+		updateCronPreview();
 	} else {
 		customCronGroup.classList.add('hidden');
 	}
@@ -280,7 +341,7 @@ schedForm.addEventListener('submit', async (e) => {
 	
 	let cron = schedCron.value;
 	if (cron === 'custom') {
-		cron = schedCustomCron.value.trim();
+		cron = getCronFromFields();
 	}
 	const configPath = schedConfig.value.trim();
 
@@ -355,13 +416,14 @@ async function handleEdit(e) {
 			schedFolder.value = (s.Folders || []).join(', ');
 			schedConfig.value = s.Config || '';
 			
-			if (['0 * * * *', '0 0 * * *', '0 0 * * 0'].includes(s.Cron)) {
+			const presets = ['0 * * * *', '0 */6 * * *', '0 12 * * *', '0 0 * * *', '0 0 * * 0', '0 0 1 * *'];
+			if (presets.includes(s.Cron)) {
 				schedCron.value = s.Cron;
 				customCronGroup.classList.add('hidden');
 			} else {
 				schedCron.value = 'custom';
-				schedCustomCron.value = s.Cron;
 				customCronGroup.classList.remove('hidden');
+				setCronFields(s.Cron);
 			}
 			schedModal.classList.add('active');
 		}
