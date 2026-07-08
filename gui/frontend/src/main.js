@@ -414,7 +414,7 @@ schedForm.addEventListener('submit', async (e) => {
 	const configPath = schedConfig.value.trim();
 
 	try {
-		await SaveSchedule(name, folders, cron, configPath);
+		await SaveSchedule(name, folders, cron, configPath, false, false);
 		schedModal.classList.remove('active');
 		loadDashboard();
 	} catch (err) {
@@ -465,7 +465,7 @@ async function handleLogs(e) {
 	logsContent.textContent = 'Fetching logs...';
 	logsModal.classList.add('active');
 	try {
-		const data = await GetLogs(name, 100);
+		const data = await GetLogs(name, 100, false);
 		logsContent.textContent = data || 'No logs available.';
 	} catch (err) {
 		logsContent.textContent = `Error fetching logs: ${err}`;
@@ -536,7 +536,7 @@ async function triggerRun(dryRun) {
 	btn.innerHTML = '<span class="btn-spinner"></span> Processing...';
 
 	try {
-		const results = await RunOrganize(folders, dryRun);
+		const results = await RunOrganize(folders, dryRun, false);
 		showResultsModal(results, dryRun);
 	} catch (err) {
 		showAlert(`Error running organizer: ${err}`);

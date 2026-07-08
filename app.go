@@ -124,6 +124,8 @@ type scheduleView struct {
 	Cron      string     `json:"cron"`
 	Folders   []string   `json:"folders"`
 	Config    string     `json:"config"`
+	Recursive bool       `json:"recursive"`
+	Yes       bool       `json:"yes"`
 	LastRun   *time.Time `json:"last_run"`
 	LastFiles int        `json:"last_files"`
 }
@@ -236,6 +238,8 @@ func (a *App) GetSchedules() ([]scheduleView, error) {
 			Cron:      s.Cron,
 			Folders:   folders,
 			Config:    s.Config,
+			Recursive: s.Recursive,
+			Yes:       s.Yes,
 			LastRun:   lastRunPtr,
 			LastFiles: lastFiles,
 		})
@@ -243,7 +247,7 @@ func (a *App) GetSchedules() ([]scheduleView, error) {
 	return views, nil
 }
 
-func (a *App) SaveSchedule(name string, folders []string, cronExpr string, configPath string) error {
+func (a *App) SaveSchedule(name string, folders []string, cronExpr string, configPath string, recursive, yes bool) error {
 	folderStr := ""
 	if len(folders) > 0 {
 		folderStr = folders[0]
@@ -252,10 +256,12 @@ func (a *App) SaveSchedule(name string, folders []string, cronExpr string, confi
 		}
 	}
 	return store.Upsert(store.Schedule{
-		Name:   name,
-		Folder: folderStr,
-		Cron:   cronExpr,
-		Config: configPath,
+		Name:      name,
+		Folder:    folderStr,
+		Cron:      cronExpr,
+		Config:    configPath,
+		Recursive: recursive,
+		Yes:       yes,
 	})
 }
 
@@ -364,7 +370,7 @@ type runResult struct {
 	Action      string `json:"action"`
 }
 
-func (a *App) RunOrganize(folders []string, dryRun bool) ([]runResult, error) {
+func (a *App) RunOrganize(folders []string, dryRun, recursive bool) ([]runResult, error) {
 	p := a.GetRulesPath()
 	cfg, err := config.Load(p)
 	if err != nil {
@@ -374,7 +380,7 @@ func (a *App) RunOrganize(folders []string, dryRun bool) ([]runResult, error) {
 	var allResults []runResult
 	var histEntries []history.Entry
 	for _, folder := range folders {
-		res, err := organizer.Organize(folder, cfg, dryRun, false)
+		res, err := organizer.Organize(folder, cfg, dryRun, recursive)
 		if err != nil {
 			return nil, err
 		}
@@ -419,7 +425,7 @@ func (a *App) ClearHistory() error {
 	return history.ClearAll()
 }
 
-func (a *App) GetLogs(name string, lines int) (string, error) {
+func (a *App) GetLogs(name string, lines int, follow bool) (string, error) {
 	srv, err := service.NewService()
 	if err != nil {
 		return "", err
@@ -431,7 +437,12 @@ func (a *App) GetLogs(name string, lines int) (string, error) {
 			return "", fmt.Errorf("journalctl not found: %w", errJ)
 		}
 		args := []string{"--user", "-u", "tuckify-" + name, "-n", fmt.Sprintf("%d", lines), "--no-pager", "-o", "short-monotonic"}
-		cmd := exec.Command(jctl, args...)
+		if follow {
+			args = append(args, "-f")
+		}
+		ctx, cancel := context.WithTimeout(a.ctx, 5*time.Second)
+		defer cancel()
+		cmd := exec.CommandContext(ctx, jctl, args...)
 		var out bytes.Buffer
 		cmd.Stdout = &out
 		cmd.Stderr = &out
