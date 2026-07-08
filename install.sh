@@ -2,7 +2,7 @@
 set -e
 
 REPO="ihsan-ramadhan/tuckify"
-VERSION="v0.2.0"
+VERSION="v0.2.1"
 
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 ARCH=$(uname -m)
@@ -18,16 +18,45 @@ case "$OS" in
     *) echo "Unsupported OS: $OS"; exit 1 ;;
 esac
 
-BINARY="tuckify-${OS}-${ARCH}"
-URL="https://github.com/${REPO}/releases/download/${VERSION}/${BINARY}"
+GUI=false
+for arg in "$@"; do
+    case "$arg" in
+        --gui|-g) GUI=true ;;
+    esac
+done
+
 INSTALL_DIR="${HOME}/.local/bin"
-
 mkdir -p "${INSTALL_DIR}"
-echo "Downloading tuckify ${VERSION} for ${OS}/${ARCH}..."
-curl -fsSL "${URL}" -o "${INSTALL_DIR}/tuckify"
 
-chmod +x "${INSTALL_DIR}/tuckify"
-echo "tuckify successfully installed to ${INSTALL_DIR}/tuckify"
+if [ "$GUI" = true ]; then
+    if [ "$OS" = "darwin" ]; then
+        URL="https://github.com/${REPO}/releases/download/${VERSION}/tuckify-gui-mac-universal.zip"
+        TMP_ZIP=$(mktemp)
+        echo "Downloading tuckify-gui ${VERSION} for macOS..."
+        curl -fsSL "${URL}" -o "${TMP_ZIP}"
+        echo "Installing to /Applications..."
+        unzip -q -o "${TMP_ZIP}" -d "/Applications"
+        rm -f "${TMP_ZIP}"
+        echo "tuckify-gui successfully installed to /Applications/tuckify-gui.app"
+    else
+        if [ "$ARCH" != "amd64" ]; then
+            echo "GUI only supports amd64 architecture on Linux currently."
+            exit 1
+        fi
+        URL="https://github.com/${REPO}/releases/download/${VERSION}/tuckify-gui-linux-amd64"
+        echo "Downloading tuckify-gui ${VERSION} for Linux (amd64)..."
+        curl -fsSL "${URL}" -o "${INSTALL_DIR}/tuckify-gui"
+        chmod +x "${INSTALL_DIR}/tuckify-gui"
+        echo "tuckify-gui successfully installed to ${INSTALL_DIR}/tuckify-gui"
+    fi
+else
+    BINARY="tuckify-${OS}-${ARCH}"
+    URL="https://github.com/${REPO}/releases/download/${VERSION}/${BINARY}"
+    echo "Downloading tuckify ${VERSION} for ${OS}/${ARCH}..."
+    curl -fsSL "${URL}" -o "${INSTALL_DIR}/tuckify"
+    chmod +x "${INSTALL_DIR}/tuckify"
+    echo "tuckify successfully installed to ${INSTALL_DIR}/tuckify"
+fi
 
 case :$PATH: in
     *:"${INSTALL_DIR}":*) ;;
