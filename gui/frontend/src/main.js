@@ -5,7 +5,7 @@ import { ICONS } from './icons.js';
 import {
 	GetSchedules, SaveSchedule, StartSchedule, StopSchedule, DeleteSchedule,
 	StartupAll, UnstartupAll, RestartSchedule,
-	GetVisualRules, SaveVisualRules,
+	GetVisualRules, SaveVisualRules, ValidateVisualRules,
 	RunOrganize,
 	GetHistory, UndoRun, DeleteHistoryRun, ClearHistory,
 	SelectDirectory, GetLogs,
@@ -36,12 +36,14 @@ const schedCron = document.getElementById('sched-cron');
 const customCronGroup = document.getElementById('custom-cron-group');
 const cronFieldsContainer = document.getElementById('cron-fields-container');
 const schedConfig = document.getElementById('sched-config');
+const schedRecursive = document.getElementById('sched-recursive');
 
 // Run Manual
 const runFolder = document.getElementById('run-folder');
 const browseRunFolder = document.getElementById('browse-run-folder');
 const runOrganizeBtn = document.getElementById('run-organize-btn');
 const runDryBtn = document.getElementById('run-dry-btn');
+const runRecursive = document.getElementById('run-recursive');
 
 // Rules Builder
 const rulesList = document.getElementById('rules-list');
@@ -412,9 +414,10 @@ schedForm.addEventListener('submit', async (e) => {
 		cron = getCronFromFields();
 	}
 	const configPath = schedConfig.value.trim();
+	const recursive = schedRecursive?.checked ?? true;
 
 	try {
-		await SaveSchedule(name, folders, cron, configPath, false, false);
+		await SaveSchedule(name, folders, cron, configPath, recursive, true);
 		schedModal.classList.remove('active');
 		loadDashboard();
 	} catch (err) {
@@ -483,6 +486,7 @@ async function handleEdit(e) {
 			schedName.value = s.name;
 			schedFolder.value = (s.folders || []).join(', ');
 			schedConfig.value = s.config || '';
+			if (schedRecursive) schedRecursive.checked = s.recursive ?? true;
 
 			const presets = ['0 * * * *', '0 */6 * * *', '0 12 * * *', '0 0 * * *', '0 0 * * 0', '0 0 1 * *'];
 			if (presets.includes(s.cron)) {
@@ -536,7 +540,7 @@ async function triggerRun(dryRun) {
 	btn.innerHTML = '<span class="btn-spinner"></span> Processing...';
 
 	try {
-		const results = await RunOrganize(folders, dryRun, false);
+		const results = await RunOrganize(folders, dryRun, runRecursive?.checked ?? true);
 		showResultsModal(results, dryRun);
 	} catch (err) {
 		showAlert(`Error running organizer: ${err}`);
@@ -814,8 +818,17 @@ saveRulesBtn.addEventListener('click', async () => {
 	try {
 		origHtml = saveRulesBtn.innerHTML;
 		saveRulesBtn.disabled = true;
-		saveRulesBtn.innerHTML = '<span class="btn-spinner"></span> Saving...';
+		saveRulesBtn.innerHTML = '<span class="btn-spinner"></span> Validating...';
 
+		const validationErr = await ValidateVisualRules(activeRules);
+		if (validationErr) {
+			validationAlert.className = 'alert alert-danger';
+			validationAlert.textContent = `Validation failed: ${validationErr}`;
+			validationAlert.classList.remove('hidden');
+			return;
+		}
+
+		saveRulesBtn.innerHTML = '<span class="btn-spinner"></span> Saving...';
 		await SaveVisualRules(activeRules);
 		await SaveConflictStrategy(conflictStrategySelect.value);
 		validationAlert.className = 'alert alert-success';

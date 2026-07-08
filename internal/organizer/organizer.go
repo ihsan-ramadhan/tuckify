@@ -429,6 +429,18 @@ func organizeFile(src string, cfg *config.Config, dryRun bool) (Result, bool) {
 		return Result{}, false
 	}
 
+	if rule.Action != "delete" {
+		destDir := parseTemplates(rule.Destination, info)
+		targetName := info.Name()
+		if rule.Rename != "" {
+			targetName = parseTemplates(rule.Rename, info)
+		}
+		dest := filepath.Join(destDir, targetName)
+		if filepath.Clean(src) == filepath.Clean(dest) {
+			return Result{}, false
+		}
+	}
+
 	if f, err := os.Open(src); err != nil {
 		return Result{
 			Source:     src,

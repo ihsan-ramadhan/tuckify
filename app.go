@@ -81,19 +81,8 @@ func (a *App) GetVisualRules() ([]RuleView, error) {
 	return views, nil
 }
 
-func (a *App) SaveVisualRules(rules []RuleView) error {
-	p := a.GetRulesPath()
-	if err := os.MkdirAll(filepath.Dir(p), 0755); err != nil {
-		return err
-	}
-
-	var cfg config.Config
-	_, err := toml.DecodeFile(p, &cfg)
-	if err != nil && !os.IsNotExist(err) {
-		return err
-	}
-
-	cfg.Rules = make([]config.Rule, 0, len(rules))
+func encodeRulesToConfig(rules []RuleView) (config.Config, error) {
+	cfg := config.Config{Settings: config.Settings{ConflictStrategy: "rename"}}
 	for _, r := range rules {
 		cfg.Rules = append(cfg.Rules, config.Rule{
 			Extensions:       r.Extensions,
@@ -107,6 +96,30 @@ func (a *App) SaveVisualRules(rules []RuleView) error {
 			MaxAge:           r.MaxAge,
 		})
 	}
+	return cfg, nil
+}
+
+func (a *App) SaveVisualRules(rules []RuleView) error {
+	p := a.GetRulesPath()
+	if err := os.MkdirAll(filepath.Dir(p), 0755); err != nil {
+		return err
+	}
+
+	existing, err := config.Load(p)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	if existing == nil {
+		existing = &config.Config{}
+	}
+
+	cfg, err := encodeRulesToConfig(rules)
+	if err != nil {
+		return err
+	}
+	if existing.Settings.ConflictStrategy != "" {
+		cfg.Settings.ConflictStrategy = existing.Settings.ConflictStrategy
+	}
 
 	var buf bytes.Buffer
 	enc := toml.NewEncoder(&buf)
@@ -115,6 +128,37 @@ func (a *App) SaveVisualRules(rules []RuleView) error {
 	}
 
 	return os.WriteFile(p, buf.Bytes(), 0644)
+}
+
+func (a *App) ValidateVisualRules(rules []RuleView) (string, error) {
+	cfg, err := encodeRulesToConfig(rules)
+	if err != nil {
+		return err.Error(), nil
+	}
+
+	tmpFile, err := os.CreateTemp("", "tuckify-validate-*.toml")
+	if err != nil {
+		return "", err
+	}
+	tmp := tmpFile.Name()
+	defer func() { _ = os.Remove(tmp) }()
+
+	var buf bytes.Buffer
+	enc := toml.NewEncoder(&buf)
+	if err := enc.Encode(cfg); err != nil {
+		_ = tmpFile.Close()
+		return err.Error(), nil
+	}
+	if _, err := tmpFile.Write(buf.Bytes()); err != nil {
+		_ = tmpFile.Close()
+		return "", err
+	}
+	_ = tmpFile.Close()
+
+	if _, err := config.Load(tmp); err != nil {
+		return err.Error(), nil
+	}
+	return "", nil
 }
 
 type scheduleView struct {
