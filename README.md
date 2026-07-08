@@ -14,26 +14,48 @@ Organize files by rule, schedule it, manage multiple folders — without touchin
 
 ### Linux & macOS
 
+**CLI:**
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ihsan-ramadhan/tuckify/main/install.sh | sh
 ```
-
 Installs to `~/.local/bin/tuckify`. Make sure `~/.local/bin` is in your `PATH`.
+
+**GUI:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/ihsan-ramadhan/tuckify/main/install.sh | sh -s -- --gui
+```
+- On **macOS**, this downloads and installs `tuckify-gui.app` directly into your `/Applications` folder.
+- On **Linux**, this installs the GUI binary to `~/.local/bin/tuckify-gui`.
 
 ### Windows
 
+**CLI:**
 1. Download `tuckify-windows-amd64.exe` from [Releases](https://github.com/ihsan-ramadhan/tuckify/releases)
-2. Rename to `tuckify.exe`
-3. Add its folder to your `PATH`
+2. Rename to `tuckify.exe` and add it to your `PATH`.
+
+**GUI:**
+1. Download `tuckify-gui-windows-amd64.exe` from [Releases](https://github.com/ihsan-ramadhan/tuckify/releases)
+2. Run the executable to launch the GUI.
 
 ### Build from source
 
 Requires Go 1.22+
 
+**CLI:**
 ```bash
 git clone https://github.com/ihsan-ramadhan/tuckify
 cd tuckify
 go build -o tuckify .
+```
+
+**GUI:**
+Requires Wails CLI and Node.js:
+```bash
+# Install Wails CLI
+go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0
+
+# Build GUI binary (output inside build/bin/)
+wails build -tags desktop
 ```
 
 ---
