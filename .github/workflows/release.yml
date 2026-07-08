@@ -23,6 +23,7 @@ jobs:
           GOOS=darwin GOARCH=amd64 go build -o dist/tuckify-darwin-amd64 .
           GOOS=darwin GOARCH=arm64 go build -o dist/tuckify-darwin-arm64 .
           GOOS=windows GOARCH=amd64 go build -o dist/tuckify-windows-amd64.exe .
+          GOOS=windows GOARCH=arm64 go build -o dist/tuckify-windows-arm64.exe .
 
       - uses: actions/upload-artifact@v4
         with:
@@ -122,10 +123,17 @@ jobs:
           name: gui-binaries-tuckify-gui-mac-universal.zip
           path: dist
 
+      - name: Generate Checksums
+        run: |
+          cd dist
+          sha256sum * > checksums.txt
+
       - uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
         with:
           generate_release_notes: true
           draft: true
-          files: dist/*
+          files: |
+            dist/*
+            dist/checksums.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
