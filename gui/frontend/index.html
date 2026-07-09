@@ -14,7 +14,6 @@
             </div>
             <nav class="tabs">
                 <button class="tab active" data-tab="dashboard">Dashboard</button>
-                <button class="tab" data-tab="run-manual">Run</button>
                 <button class="tab" data-tab="rules-builder">Rules</button>
                 <button class="tab" data-tab="history">History</button>
             </nav>
@@ -53,10 +52,33 @@
                         <div class="summary-stat" id="stat-total-runs">0</div>
                         <div class="summary-label">Runs This Week</div>
                     </div>
+                </div>                
+                <div class="section-header" style="margin-top:40px;">
+                    <h2>Quick Run</h2>
+                </div>
+                <div class="card" style="max-width: 100%;">
+                    <div class="form-group">
+                        <label>Target Folders</label>
+                        <div class="folder-picker">
+                            <div class="tags-container" id="run-folder-tags" style="min-height:auto;"></div>
+                            <div class="picker-wrapper">
+                                <input type="text" id="run-folder-input" class="tag-input" placeholder="Type folder path or browse...">
+                                <button type="button" id="browse-run-folder" class="btn btn-secondary"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> Browse...</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:12px; align-items:center;">
+                        <button type="button" id="run-organize-btn" class="btn btn-primary"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run Organize</button>
+                        <button type="button" id="run-dry-btn" class="btn btn-secondary"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Dry Run</button>
+                        <label class="checkbox-label" style="margin-left:auto;">
+                            <input type="checkbox" id="run-recursive" checked>
+                            <span>Recursive</span>
+                        </label>
+                    </div>
                 </div>
 
                 <!-- Schedules Section -->
-                <div class="section-header">
+                <div class="section-header" style="margin-top:40px;">
                     <h2>Schedules</h2>
                     <div style="display:flex; gap:8px;">
                         <button id="startup-all-btn" class="btn btn-secondary">Start All</button>
@@ -80,10 +102,13 @@
                                     <input type="text" id="sched-name" class="form-control" required placeholder="e.g. downloads-cleaner">
                                 </div>
                                 <div class="form-group">
-                                    <label for="sched-folder">Target Folders</label>
-                                    <div class="picker-wrapper">
-                                        <input type="text" id="sched-folder" class="form-control" required placeholder="Select folders or separate with commas...">
-                                        <button type="button" id="browse-sched-folder" class="btn btn-secondary"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> Browse...</button>
+                                    <label>Target Folders</label>
+                                    <div class="folder-picker">
+                                        <div class="tags-container" id="sched-folder-tags"></div>
+                                        <div class="picker-wrapper">
+                                            <input type="text" id="sched-folder-input" class="tag-input" placeholder="Type folder path or browse...">
+                                            <button type="button" id="browse-sched-folder" class="btn btn-secondary"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> Browse...</button>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="form-group">
@@ -132,31 +157,6 @@
                 </div>
             </section>
 
-            <!-- Run Manual Tab -->
-            <section id="run-manual" class="tab-panel">
-                <div class="section-header">
-                    <h2>Run Organizer Once</h2>
-                </div>
-                <div class="card" style="max-width: 600px; margin: 0 auto;">
-                    <div class="form-group">
-                        <label for="run-folder">Target Folders</label>
-                        <div class="picker-wrapper">
-                            <input type="text" id="run-folder" class="form-control" placeholder="Select folders or separate with commas..." required>
-                            <button type="button" id="browse-run-folder" class="btn btn-secondary"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> Browse...</button>
-                        </div>
-                    </div>
-                    <div style="display:flex; gap:12px; margin-top:24px;">
-                        <button type="button" id="run-organize-btn" class="btn btn-primary" style="flex:1; justify-content:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run Organize</button>
-                        <button type="button" id="run-dry-btn" class="btn btn-secondary" style="flex:1; justify-content:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Dry Run</button>
-                    </div>
-                    <div style="display:flex; gap:24px; margin-top:16px; padding-top:16px; border-top:1px solid var(--border-subtle);">
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="run-recursive" checked>
-                            <span>Recursive (include subfolders)</span>
-                        </label>
-                    </div>
-                </div>
-            </section>
 
             <!-- Rules Builder Tab -->
             <section id="rules-builder" class="tab-panel">
@@ -183,7 +183,7 @@
                     
                     <div id="validation-alert" class="alert hidden"></div>
 
-                    <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:24px; border-top:1px solid var(--border-subtle); padding-top:20px;">
+                    <div class="rules-footer">
                         <button type="button" id="reset-rules-btn" class="btn btn-secondary">Discard</button>
                         <button type="button" id="save-rules-btn" class="btn btn-primary">Save Rules</button>
                     </div>

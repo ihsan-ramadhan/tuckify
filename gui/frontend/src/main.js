@@ -15,6 +15,8 @@ import {
 // state management
 let currentTab = 'dashboard';
 let activeRules = []; // stores visual rules list
+let schedFolders = [];
+let runFolders = [];
 
 // DOM elements
 const tabs = document.querySelectorAll('.tab');
@@ -30,7 +32,8 @@ const schedForm = document.getElementById('sched-form');
 const schedFormTitle = document.getElementById('sched-form-title');
 const schedOrigName = document.getElementById('sched-orig-name');
 const schedName = document.getElementById('sched-name');
-const schedFolder = document.getElementById('sched-folder');
+const schedFolderInput = document.getElementById('sched-folder-input');
+const schedFolderTags = document.getElementById('sched-folder-tags');
 const browseSchedFolder = document.getElementById('browse-sched-folder');
 const schedCron = document.getElementById('sched-cron');
 const customCronGroup = document.getElementById('custom-cron-group');
@@ -39,7 +42,8 @@ const schedConfig = document.getElementById('sched-config');
 const schedRecursive = document.getElementById('sched-recursive');
 
 // Run Manual
-const runFolder = document.getElementById('run-folder');
+const runFolderInput = document.getElementById('run-folder-input');
+const runFolderTags = document.getElementById('run-folder-tags');
 const browseRunFolder = document.getElementById('browse-run-folder');
 const runOrganizeBtn = document.getElementById('run-organize-btn');
 const runDryBtn = document.getElementById('run-dry-btn');
@@ -131,49 +135,85 @@ globalThis.addEventListener('click', (e) => {
 	if (e.target === alertModal) alertModal.classList.remove('active');
 });
 
-function updateBrowseBtn(input, btn) {
-	const hasValue = input.value.trim().length > 0;
-	btn.innerHTML = `${ICONS.folder} ${hasValue ? 'Add More' : 'Browse...'}`;
+// Folder tag pills helpers
+function renderFolderPills(container, folders, onRemove) {
+	if (!container) return;
+	if (!folders || folders.length === 0) {
+		container.innerHTML = '';
+		return;
+	}
+	container.innerHTML = folders.map((f, i) =>
+		`<span class="tag-pill" title="${f}">${f} <span class="tag-close" data-folder-idx="${i}">&times;</span></span>`
+	).join('');
+	container.querySelectorAll('.tag-close').forEach(el => {
+		el.addEventListener('click', (e) => {
+			e.stopPropagation();
+			const idx = Number(e.target.dataset.folderIdx);
+			if (typeof onRemove === 'function') onRemove(idx);
+		});
+	});
+}
+
+function addFolderTo(array, path, renderCb) {
+	const trimmed = path.trim();
+	if (!trimmed) return;
+	if (!array.includes(trimmed)) {
+		array.push(trimmed);
+		renderCb();
+	}
+}
+
+function removeFolderFrom(array, idx, renderCb) {
+	array.splice(idx, 1);
+	renderCb();
+}
+
+function renderSchedPills() {
+	renderFolderPills(schedFolderTags, schedFolders, (idx) => {
+		removeFolderFrom(schedFolders, idx, renderSchedPills);
+	});
+}
+
+function renderRunPills() {
+	renderFolderPills(runFolderTags, runFolders, (idx) => {
+		removeFolderFrom(runFolders, idx, renderRunPills);
+	});
 }
 
 // Folder Pickers (wails Go dialog binding)
 browseSchedFolder.addEventListener('click', async () => {
 	try {
 		const path = await SelectDirectory('Select target folder for schedule');
-		if (path) {
-			const currentVal = schedFolder.value.trim();
-			if (currentVal) {
-				schedFolder.value = `${currentVal}, ${path}`;
-			} else {
-				schedFolder.value = path;
-			}
-			updateBrowseBtn(schedFolder, browseSchedFolder);
-		}
+		if (path) addFolderTo(schedFolders, path, renderSchedPills);
 	} catch (err) {
 		showAlert(`Error selecting directory: ${err}`);
 	}
 });
 
-schedFolder.addEventListener('input', () => updateBrowseBtn(schedFolder, browseSchedFolder));
+schedFolderInput.addEventListener('keydown', (e) => {
+	if (e.key === 'Enter') {
+		e.preventDefault();
+		addFolderTo(schedFolders, schedFolderInput.value, renderSchedPills);
+		schedFolderInput.value = '';
+	}
+});
 
 browseRunFolder.addEventListener('click', async () => {
 	try {
 		const path = await SelectDirectory('Select folder to organize');
-		if (path) {
-			const currentVal = runFolder.value.trim();
-			if (currentVal) {
-				runFolder.value = `${currentVal}, ${path}`;
-			} else {
-				runFolder.value = path;
-			}
-			updateBrowseBtn(runFolder, browseRunFolder);
-		}
+		if (path) addFolderTo(runFolders, path, renderRunPills);
 	} catch (err) {
 		showAlert(`Error selecting directory: ${err}`);
 	}
 });
 
-runFolder.addEventListener('input', () => updateBrowseBtn(runFolder, browseRunFolder));
+runFolderInput.addEventListener('keydown', (e) => {
+	if (e.key === 'Enter') {
+		e.preventDefault();
+		addFolderTo(runFolders, e.target.value, renderRunPills);
+		runFolderInput.value = '';
+	}
+});
 
 // Generate custom cron field dropdowns
 function buildCronFieldOptions() {
@@ -395,8 +435,9 @@ addSchedBtn.addEventListener('click', () => {
 	schedFormTitle.textContent = 'New Schedule';
 	schedOrigName.value = '';
 	schedForm.reset();
+	schedFolders = [];
+	renderSchedPills();
 	customCronGroup.classList.add('hidden');
-	updateBrowseBtn(schedFolder, browseSchedFolder);
 	schedModal.classList.add('active');
 });
 
@@ -406,8 +447,7 @@ cancelSchedBtn.addEventListener('click', () => schedModal.classList.remove('acti
 schedForm.addEventListener('submit', async (e) => {
 	e.preventDefault();
 	const name = schedName.value.trim();
-	const folderVal = schedFolder.value.trim();
-	const folders = folderVal.split(',').map(s => s.trim()).filter(s => s !== '');
+	const folders = [...schedFolders];
 
 	let cron = schedCron.value;
 	if (cron === 'custom') {
@@ -487,7 +527,8 @@ async function handleEdit(e) {
 			schedFormTitle.textContent = 'Edit Schedule';
 			schedOrigName.value = s.name;
 			schedName.value = s.name;
-			schedFolder.value = (s.folders || []).join(', ');
+			schedFolders = [...(s.folders || [])];
+			renderSchedPills();
 			schedConfig.value = s.config || '';
 			if (schedRecursive) schedRecursive.checked = s.recursive ?? true;
 
@@ -500,7 +541,6 @@ async function handleEdit(e) {
 				customCronGroup.classList.remove('hidden');
 				setCronFields(s.cron);
 			}
-			updateBrowseBtn(schedFolder, browseSchedFolder);
 			schedModal.classList.add('active');
 		}
 	} catch (err) {
@@ -525,15 +565,9 @@ runOrganizeBtn.addEventListener('click', () => triggerRun(false));
 runDryBtn.addEventListener('click', () => triggerRun(true));
 
 async function triggerRun(dryRun) {
-	const folderVal = runFolder.value.trim();
-	if (!folderVal) {
-		showAlert('Please select a target folder first!');
-		return;
-	}
-
-	const folders = folderVal.split(',').map(s => s.trim()).filter(s => s !== '');
+	const folders = [...runFolders];
 	if (folders.length === 0) {
-		showAlert('Please enter a valid target folder!');
+		showAlert('Please select at least one target folder first!');
 		return;
 	}
 

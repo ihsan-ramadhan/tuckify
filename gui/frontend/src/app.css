@@ -153,7 +153,6 @@ body {
 	padding: 24px;
 	margin-bottom: 24px;
 	position: relative;
-	overflow: hidden;
 	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
 }
 
@@ -485,6 +484,58 @@ select.form-control option {
 	display: flex;
 	gap: 12px;
 	margin-top: 24px;
+}
+
+/* Folder tag pills */
+.folder-picker {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.folder-picker .picker-wrapper {
+	display: flex;
+	gap: 8px;
+}
+
+.folder-picker .picker-wrapper .tag-input {
+	flex: 1;
+	background: #0b0c0d;
+	border: 1px solid var(--border-standard);
+	border-radius: 6px;
+	padding: 10px 14px;
+	color: var(--text-primary);
+	font-size: 13px;
+	outline: none;
+	transition: all 0.2s ease;
+	min-width: 0;
+}
+
+.folder-picker .picker-wrapper .tag-input:focus {
+	border-color: var(--brand-indigo);
+}
+
+.folder-picker .tags-container {
+	min-height: auto;
+	padding: 6px 8px;
+}
+
+/* Sticky Rules Footer */
+.rules-footer {
+	display: flex;
+	justify-content: flex-end;
+	gap: 12px;
+	margin-top: 24px;
+	padding: 16px 20px;
+	border-top: 1px solid var(--border-subtle);
+	position: sticky;
+	bottom: 0;
+	background: var(--bg-surface);
+	z-index: 10;
+	margin-left: -24px;
+	margin-right: -24px;
+	margin-bottom: -24px;
+	border-radius: 0 0 12px 12px;
 }
 
 /* Rules Builder UI */
