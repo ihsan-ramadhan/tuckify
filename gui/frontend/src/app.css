@@ -153,7 +153,6 @@ body {
 	padding: 24px;
 	margin-bottom: 24px;
 	position: relative;
-	overflow: hidden;
 	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
 }
 
@@ -487,6 +486,58 @@ select.form-control option {
 	margin-top: 24px;
 }
 
+/* Folder tag pills */
+.folder-picker {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.folder-picker .picker-wrapper {
+	display: flex;
+	gap: 8px;
+}
+
+.folder-picker .picker-wrapper .tag-input {
+	flex: 1;
+	background: #0b0c0d;
+	border: 1px solid var(--border-standard);
+	border-radius: 6px;
+	padding: 10px 14px;
+	color: var(--text-primary);
+	font-size: 13px;
+	outline: none;
+	transition: all 0.2s ease;
+	min-width: 0;
+}
+
+.folder-picker .picker-wrapper .tag-input:focus {
+	border-color: var(--brand-indigo);
+}
+
+.folder-picker .tags-container {
+	min-height: auto;
+	padding: 6px 8px;
+}
+
+/* Sticky Rules Footer */
+.rules-footer {
+	display: flex;
+	justify-content: flex-end;
+	gap: 12px;
+	margin-top: 24px;
+	padding: 16px 20px;
+	border-top: 1px solid var(--border-subtle);
+	position: sticky;
+	bottom: 0;
+	background: var(--bg-surface);
+	z-index: 10;
+	margin-left: -24px;
+	margin-right: -24px;
+	margin-bottom: -24px;
+	border-radius: 0 0 12px 12px;
+}
+
 /* Rules Builder UI */
 .rules-list {
 	display: flex;
@@ -776,6 +827,74 @@ tr:hover td {
 	letter-spacing: normal !important;
 	cursor: pointer;
 	margin-bottom: 0 !important;
+}
+
+.config-path {
+	font-size: 10px;
+	color: var(--text-quaternary);
+	font-family: 'JetBrains Mono', monospace;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 300px;
+	cursor: default;
+}
+
+.config-path:hover {
+	color: var(--text-tertiary);
+}
+
+/* Toast Notifications */
+#toast-container {
+	position: fixed;
+	bottom: 24px;
+	right: 24px;
+	z-index: 9999;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	pointer-events: none;
+}
+
+.toast {
+	padding: 12px 20px;
+	border-radius: 8px;
+	font-size: 13px;
+	font-weight: 510;
+	color: white;
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+	animation: toastSlideIn 0.3s ease, toastFadeOut 0.3s ease 2.7s forwards;
+	pointer-events: auto;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	max-width: 420px;
+	line-height: 1.4;
+}
+
+.toast-success {
+	background: #10b981;
+	border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.toast-error {
+	background: #ef4444;
+	border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.toast-info {
+	background: #5e6ad2;
+	border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+@keyframes toastSlideIn {
+	from { opacity: 0; transform: translateX(24px); }
+	to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes toastFadeOut {
+	from { opacity: 1; transform: translateX(0); }
+	to { opacity: 0; transform: translateX(-8px); }
 }
 
 .visually-hidden {
