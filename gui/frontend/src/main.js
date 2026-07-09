@@ -461,6 +461,7 @@ schedForm.addEventListener('submit', async (e) => {
 	if (cron === 'custom') {
 		cron = getCronFromFields();
 	}
+
 	const configPath = schedConfig.value.trim();
 	const recursive = schedRecursive?.checked ?? true;
 
@@ -678,7 +679,10 @@ function buildRuleCardHtml(rule, idx) {
 				</div>
 				<div class="rule-field">
 					<span class="rule-field-label">Filename Regex</span>
-					<input type="text" class="form-control regex-input" data-idx="${idx}" value="${(rule.filename_regex || []).join(', ')}" placeholder="e.g. ^[0-9]{4}-">
+					<div class="input-with-error">
+						<input type="text" class="form-control regex-input" data-idx="${idx}" value="${(rule.filename_regex || []).join(', ')}" placeholder="e.g. ^[0-9]{4}-">
+						<span class="field-error hidden" data-idx="${idx}"></span>
+					</div>
 				</div>
 				<div class="rule-field">
 					<span class="rule-field-label">Min Size</span>
@@ -794,10 +798,36 @@ function handlePatternChange(e) {
 	activeRules[idx].filename_patterns = val.split(',').map(s => s.trim()).filter(s => s !== '');
 }
 
+function validateRegexList(val) {
+	const patterns = val.split(',').map(s => s.trim()).filter(s => s !== '');
+	for (const p of patterns) {
+		try {
+			new RegExp(p);
+		} catch {
+			return p;
+		}
+	}
+	return null;
+}
+
 function handleRegexChange(e) {
 	const idx = Number(e.target.dataset.idx);
 	const val = e.target.value;
 	activeRules[idx].filename_regex = val.split(',').map(s => s.trim()).filter(s => s !== '');
+
+	// inline validation
+	const errorEl = e.target.parentElement.querySelector('.field-error');
+	const failed = validateRegexList(val);
+	if (failed) {
+		e.target.classList.add('has-error');
+		if (errorEl) {
+			errorEl.textContent = `Invalid regex: "${failed}"`;
+			errorEl.classList.remove('hidden');
+		}
+	} else {
+		e.target.classList.remove('has-error');
+		if (errorEl) errorEl.classList.add('hidden');
+	}
 }
 
 addRuleBtn.addEventListener('click', () => {
