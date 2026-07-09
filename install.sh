@@ -22,6 +22,7 @@ GUI=false
 for arg in "$@"; do
     case "$arg" in
         --gui|-g) GUI=true ;;
+        *) ;; # ignore unknown arguments
     esac
 done
 

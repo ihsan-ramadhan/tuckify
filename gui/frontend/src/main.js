@@ -18,6 +18,11 @@ let activeRules = []; // stores visual rules list
 let schedFolders = [];
 let runFolders = [];
 
+// history pagination
+let allHistoryRuns = [];
+let historyPage = 0;
+const HISTORY_PAGE_SIZE = 20;
+
 // DOM elements
 const tabs = document.querySelectorAll('.tab');
 const tabPanels = document.querySelectorAll('.tab-panel');
@@ -632,33 +637,19 @@ async function loadRulesBuilder() {
 	}
 }
 
-function renderRules() {
-	rulesList.innerHTML = '';
-	if (activeRules.length === 0) {
-		rulesList.innerHTML = '<div class="empty-state">No rules defined. Click "+ Add New Rule" to create one.</div>';
-		return;
-	}
+function buildRuleCardHtml(rule, idx) {
+	const tagPills = (rule.extensions || []).map(ext => `
+		<span class="tag-pill">${ext} <span class="tag-close" data-idx="${idx}" data-val="${ext}">&times;</span></span>
+	`).join('');
+	const showAdv = rule._showAdvanced ? '' : 'hidden';
+	const toggleText = rule._showAdvanced ? 'Hide Advanced Options' : 'Show Advanced Options';
 
-	activeRules.forEach((rule, idx) => {
-		const rcard = document.createElement('div');
-		rcard.className = 'rule-card';
-
-		// tags container (extensions)
-		const tagPills = (rule.extensions || []).map(ext => `
-			<span class="tag-pill">${ext} <span class="tag-close" data-idx="${idx}" data-val="${ext}">&times;</span></span>
-		`).join('');
-
-		const showAdv = rule._showAdvanced ? '' : 'hidden';
-		const toggleText = rule._showAdvanced ? 'Hide Advanced Options' : 'Show Advanced Options';
-
-		rcard.innerHTML = `
+	return `
+		<div class="rule-card">
 			<div class="rule-main-row">
 				<div class="rule-field">
 					<span class="rule-field-label">File Extensions</span>
-					<div class="tags-container">
-						${tagPills}
-						<input type="text" class="tag-input" placeholder="+ add ext..." data-idx="${idx}">
-					</div>
+					<div class="tags-container">${tagPills}<input type="text" class="tag-input" placeholder="+ add ext..." data-idx="${idx}"></div>
 				</div>
 				<div class="rule-field">
 					<span class="rule-field-label">Action</span>
@@ -676,77 +667,65 @@ function renderRules() {
 					</div>
 				</div>
 			</div>
-
 			<button type="button" class="rule-advanced-toggle" data-idx="${idx}">${toggleText}</button>
-
 			<div class="rule-advanced-panel ${showAdv}">
 				<div class="rule-field">
-					<span class="rule-field-label">Filename Patterns (Glob, e.g. *Invoice*, *Report*)</span>
+					<span class="rule-field-label">Filename Patterns (Glob)</span>
 					<input type="text" class="form-control pattern-input" data-idx="${idx}" value="${(rule.filename_patterns || []).join(', ')}" placeholder="e.g. *Invoice*, *Report*">
 				</div>
 				<div class="rule-field">
-					<span class="rule-field-label">Filename Regex (Regex, e.g. ^[0-9]{4}-)</span>
+					<span class="rule-field-label">Filename Regex</span>
 					<input type="text" class="form-control regex-input" data-idx="${idx}" value="${(rule.filename_regex || []).join(', ')}" placeholder="e.g. ^[0-9]{4}-">
 				</div>
 				<div class="rule-field">
-					<span class="rule-field-label">Min Size (e.g. 10KB, 5MB)</span>
+					<span class="rule-field-label">Min Size</span>
 					<input type="text" class="form-control minsize-input" data-idx="${idx}" value="${rule.min_size || ''}" placeholder="e.g. 10KB">
 				</div>
 				<div class="rule-field">
-					<span class="rule-field-label">Max Size (e.g. 50MB, 1GB)</span>
+					<span class="rule-field-label">Max Size</span>
 					<input type="text" class="form-control maxsize-input" data-idx="${idx}" value="${rule.max_size || ''}" placeholder="e.g. 50MB">
 				</div>
 				<div class="rule-field">
-					<span class="rule-field-label">Min Age (e.g. 24h, 7d)</span>
+					<span class="rule-field-label">Min Age</span>
 					<input type="text" class="form-control minage-input" data-idx="${idx}" value="${rule.min_age || ''}" placeholder="e.g. 24h">
 				</div>
 				<div class="rule-field">
-					<span class="rule-field-label">Max Age (e.g. 30d, 365d)</span>
+					<span class="rule-field-label">Max Age</span>
 					<input type="text" class="form-control maxage-input" data-idx="${idx}" value="${rule.max_age || ''}" placeholder="e.g. 30d">
 				</div>
 			</div>
-		`;
+		</div>
+	`;
+}
 
-		rulesList.appendChild(rcard);
-	});
+function registerRuleEvents() {
+	document.querySelectorAll('.tag-input').forEach(input => input.addEventListener('keydown', handleAddTag));
+	document.querySelectorAll('.tag-close').forEach(btn => btn.addEventListener('click', handleRemoveTag));
+	document.querySelectorAll('.action-select').forEach(sel => sel.addEventListener('change', handleActionChange));
+	document.querySelectorAll('.browse-dest-btn').forEach(btn => btn.addEventListener('click', handleBrowseDest));
+	document.querySelectorAll('.remove-rule-btn').forEach(btn => btn.addEventListener('click', handleRemoveRule));
+	document.querySelectorAll('.rule-advanced-toggle').forEach(btn => btn.addEventListener('click', handleToggleAdvanced));
+	document.querySelectorAll('.pattern-input').forEach(inp => inp.addEventListener('input', handlePatternChange));
+	document.querySelectorAll('.regex-input').forEach(inp => inp.addEventListener('input', handleRegexChange));
 
-	// register rule interaction events
-	document.querySelectorAll('.tag-input').forEach(input => {
-		input.addEventListener('keydown', handleAddTag);
+const FIELD_MAP = { minsize: 'min_size', maxsize: 'max_size', minage: 'min_age', maxage: 'max_age' };
+	['minsize','maxsize','minage','maxage'].forEach(field => {
+		document.querySelectorAll(`.${field}-input`).forEach(inp => {
+			inp.addEventListener('input', e => {
+				activeRules[Number(e.target.dataset.idx)][FIELD_MAP[field]] = e.target.value.trim();
+			});
+		});
 	});
-	document.querySelectorAll('.tag-close').forEach(closeBtn => {
-		closeBtn.addEventListener('click', handleRemoveTag);
-	});
-	document.querySelectorAll('.action-select').forEach(select => {
-		select.addEventListener('change', handleActionChange);
-	});
-	document.querySelectorAll('.browse-dest-btn').forEach(btn => {
-		btn.addEventListener('click', handleBrowseDest);
-	});
-	document.querySelectorAll('.remove-rule-btn').forEach(btn => {
-		btn.addEventListener('click', handleRemoveRule);
-	});
-	document.querySelectorAll('.rule-advanced-toggle').forEach(btn => {
-		btn.addEventListener('click', handleToggleAdvanced);
-	});
-	document.querySelectorAll('.pattern-input').forEach(input => {
-		input.addEventListener('input', handlePatternChange);
-	});
-	document.querySelectorAll('.regex-input').forEach(input => {
-		input.addEventListener('input', handleRegexChange);
-	});
-	document.querySelectorAll('.minsize-input').forEach(input => {
-		input.addEventListener('input', e => { activeRules[Number(e.target.dataset.idx)].min_size = e.target.value.trim(); });
-	});
-	document.querySelectorAll('.maxsize-input').forEach(input => {
-		input.addEventListener('input', e => { activeRules[Number(e.target.dataset.idx)].max_size = e.target.value.trim(); });
-	});
-	document.querySelectorAll('.minage-input').forEach(input => {
-		input.addEventListener('input', e => { activeRules[Number(e.target.dataset.idx)].min_age = e.target.value.trim(); });
-	});
-	document.querySelectorAll('.maxage-input').forEach(input => {
-		input.addEventListener('input', e => { activeRules[Number(e.target.dataset.idx)].max_age = e.target.value.trim(); });
-	});
+}
+
+function renderRules() {
+	if (activeRules.length === 0) {
+		rulesList.innerHTML = '<div class="empty-state">No rules defined. Click "+ Add New Rule" to create one.</div>';
+		return;
+	}
+
+	rulesList.innerHTML = activeRules.map((rule, idx) => buildRuleCardHtml(rule, idx)).join('');
+	registerRuleEvents();
 }
 
 // rule events
@@ -833,105 +812,132 @@ resetRulesBtn.addEventListener('click', () => {
 	loadRulesBuilder();
 });
 
-saveRulesBtn.addEventListener('click', async () => {
-	// client-side simple verification
-	for (const r of activeRules) {
+function validateRulesInput(rules) {
+	for (const r of rules) {
 		const hasExt = r.extensions?.length > 0;
 		const hasPattern = r.filename_patterns?.length > 0;
 		const hasRegex = r.filename_regex?.length > 0;
-		const hasDest = r.action === 'delete' || r.destination?.trim();
-
 		if (!hasExt && !hasPattern && !hasRegex) {
-			showAlert('Each rule must have at least one match criteria: file extension, filename pattern, or filename regex.');
-			return;
+			return 'Each rule must have at least one match criteria: file extension, filename pattern, or filename regex.';
 		}
-		if (!hasDest && r.action !== 'delete') {
-			showAlert('Destination folder is required when action is "Move File"!');
-			return;
+		if (r.action !== 'delete' && !r.destination?.trim()) {
+			return 'Destination folder is required when action is "Move File"!';
 		}
 	}
+	return null;
+}
 
-	let origHtml;
+async function asyncSaveRules(rules, strategy) {
 	try {
-		origHtml = saveRulesBtn.innerHTML;
-		saveRulesBtn.disabled = true;
-		saveRulesBtn.innerHTML = '<span class="btn-spinner"></span> Validating...';
+		const validationErr = await ValidateVisualRules(rules);
+		if (validationErr) return `Validation failed: ${validationErr}`;
+		await SaveVisualRules(rules);
+		await SaveConflictStrategy(strategy);
+		return null;
+	} catch (err) {
+		return `Error: ${err}`;
+	}
+}
 
-		const validationErr = await ValidateVisualRules(activeRules);
-		if (validationErr) {
-			validationAlert.className = 'alert alert-danger';
-			validationAlert.textContent = `Validation failed: ${validationErr}`;
-			validationAlert.classList.remove('hidden');
-			return;
-		}
+saveRulesBtn.addEventListener('click', async () => {
+	const msg = validateRulesInput(activeRules);
+	if (msg) { showAlert(msg); return; }
 
-		saveRulesBtn.innerHTML = '<span class="btn-spinner"></span> Saving...';
-		await SaveVisualRules(activeRules);
-		await SaveConflictStrategy(conflictStrategySelect.value);
+	const btn = saveRulesBtn;
+	const origHtml = btn.innerHTML;
+	btn.disabled = true;
+	btn.innerHTML = '<span class="btn-spinner"></span> Validating...';
+
+	const err = await asyncSaveRules(activeRules, conflictStrategySelect.value);
+
+	if (err) {
+		validationAlert.className = 'alert alert-danger';
+		validationAlert.textContent = err;
+		validationAlert.classList.remove('hidden');
+	} else {
 		validationAlert.classList.add('hidden');
 		showToast('Rules saved successfully!', 'success');
-	} catch (err) {
-		validationAlert.className = 'alert alert-danger';
-		validationAlert.textContent = `Error: ${err}`;
-		validationAlert.classList.remove('hidden');
-	} finally {
-		saveRulesBtn.disabled = false;
-		saveRulesBtn.innerHTML = origHtml || 'Save Rules';
 	}
+
+	btn.disabled = false;
+	btn.innerHTML = origHtml || 'Save Rules';
 });
 
-// history
+function formatRunDate(ts) {
+	if (!ts) return '\u2014';
+	let d = new Date(ts);
+	if (Number.isNaN(d.getTime())) {
+		d = new Date(ts.replace(/(\.\d{3})\d+/, '$1'));
+	}
+	if (!Number.isNaN(d.getTime()) && d.getFullYear() > 2000) {
+		return d.toLocaleString();
+	}
+	return '\u2014';
+}
+
+function renderHistoryRows(runs) {
+	runs.forEach(r => {
+		const tr = document.createElement('tr');
+		const dateStr = formatRunDate(r.timestamp);
+		const foldersText = (r.folders || []).join(', ');
+		const entriesArr = r.entries || [];
+		const movedCount = entriesArr.filter(e => e.action === 'move' || !e.action).length;
+
+		tr.innerHTML = `
+			<td>${dateStr}</td>
+			<td><code>${foldersText || '\u2014'}</code></td>
+			<td><span class="badge">${movedCount} items</span></td>
+			<td>
+				<div style="display:flex; gap:6px;">
+				${movedCount > 0 ?
+					`<button class="btn btn-secondary undo-btn" style="padding:4px 8px; font-size:11px;" data-id="${r.id}">Undo</button>` :
+					`<span style="color:var(--text-tertiary)">none</span>`
+				}
+				<button class="btn btn-danger delete-history-btn" style="padding:4px 8px; font-size:11px;" data-id="${r.id}">${ICONS.trash}</button>
+				</div>
+			</td>
+		`;
+		historyRows.appendChild(tr);
+	});
+
+	document.querySelectorAll('.undo-btn').forEach(b => b.addEventListener('click', handleUndo));
+	document.querySelectorAll('.delete-history-btn').forEach(b => b.addEventListener('click', handleDeleteHistory));
+}
+
+function renderHistoryFooter() {
+	const footer = document.getElementById('history-footer');
+	if (!footer) return;
+	const totalShown = (historyPage + 1) * HISTORY_PAGE_SIZE;
+	if (totalShown < allHistoryRuns.length) {
+		footer.innerHTML = `<button class="btn btn-secondary load-more-btn">Load More (${allHistoryRuns.length - totalShown} remaining)</button>`;
+		footer.querySelector('.load-more-btn').addEventListener('click', () => {
+			historyPage++;
+			renderHistoryRows(allHistoryRuns.slice(historyPage * HISTORY_PAGE_SIZE, (historyPage + 1) * HISTORY_PAGE_SIZE));
+			renderHistoryFooter();
+		});
+	} else {
+		footer.innerHTML = totalShown >= HISTORY_PAGE_SIZE ? '<span style="font-size:12px;color:var(--text-tertiary)">Showing all ' + allHistoryRuns.length + ' entries</span>' : '';
+	}
+}
+
 async function loadHistory() {
 	try {
 		historyRows.innerHTML = '<tr><td colspan="4" style="text-align:center;">Loading history...</td></tr>';
-		const runs = await GetHistory();
-
+		allHistoryRuns = await GetHistory();
 		historyRows.innerHTML = '';
+		historyPage = 0;
 
-		if (!runs || runs.length === 0) {
+		if (!allHistoryRuns || allHistoryRuns.length === 0) {
 			historyRows.innerHTML = '<tr><td colspan="4" style="text-align:center;">No execution history found.</td></tr>';
+			document.getElementById('history-footer').innerHTML = '';
 			return;
 		}
 
-		runs.sort((a, b) => (b.id || 0) - (a.id || 0));
+		allHistoryRuns.sort((a, b) => (b.id || 0) - (a.id || 0));
 
-		runs.forEach(r => {
-			const tr = document.createElement('tr');
-			let dateStr = '\u2014';
-			const ts = r.timestamp;
-			if (ts) {
-				let d = new Date(ts);
-				if (Number.isNaN(d.getTime())) {
-					d = new Date(ts.replace(/(\.\d{3})\d+/, '$1'));
-				}
-				if (!Number.isNaN(d.getTime()) && d.getFullYear() > 2000) {
-					dateStr = d.toLocaleString();
-				}
-			}
-
-			const foldersText = (r.folders || []).join(', ');
-			const entriesArr = r.entries || [];
-			const movedCount = entriesArr.filter(e => e.action === 'move' || !e.action).length;
-
-			tr.innerHTML = `
-				<td>${dateStr}</td>
-				<td><code>${foldersText || '\u2014'}</code></td>
-				<td><span class="badge">${movedCount} items</span></td>
-				<td>
-					<div style="display:flex; gap:6px;">
-					${movedCount > 0 ?
-						`<button class="btn btn-secondary undo-btn" style="padding:4px 8px; font-size:11px;" data-id="${r.id}">Undo</button>` :
-						`<span style="color:var(--text-tertiary)">none</span>`
-					}
-					<button class="btn btn-danger delete-history-btn" style="padding:4px 8px; font-size:11px;" data-id="${r.id}">${ICONS.trash}</button>
-					</div>
-				</td>
-			`;
-			historyRows.appendChild(tr);
-		});
-
-		document.querySelectorAll('.undo-btn').forEach(b => b.addEventListener('click', handleUndo));
-		document.querySelectorAll('.delete-history-btn').forEach(b => b.addEventListener('click', handleDeleteHistory));
+		const initialBatch = allHistoryRuns.slice(0, HISTORY_PAGE_SIZE);
+		renderHistoryRows(initialBatch);
+		renderHistoryFooter();
 
 	} catch (err) {
 		historyRows.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--danger)">Error: ${err}</td></tr>`;

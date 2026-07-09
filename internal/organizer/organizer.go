@@ -412,15 +412,37 @@ func deleteEmptyDirs(root string) error {
 	return nil
 }
 
+func buildRuleDest(rule *config.Rule, info os.FileInfo) string {
+	destDir := parseTemplates(rule.Destination, info)
+	targetName := info.Name()
+	if rule.Rename != "" {
+		targetName = parseTemplates(rule.Rename, info)
+	}
+	return filepath.Join(destDir, targetName)
+}
+
+func isSelfMove(src string, rule *config.Rule, info os.FileInfo) bool {
+	if rule.Action == "delete" {
+		return false
+	}
+	dest := buildRuleDest(rule, info)
+	return filepath.Clean(src) == filepath.Clean(dest)
+}
+
+func checkFileAccessible(src string) error {
+	f, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	_ = f.Close()
+	return nil
+}
+
 func organizeFile(src string, cfg *config.Config, dryRun bool) (Result, bool) {
 	name := filepath.Base(src)
 	info, err := os.Stat(src)
 	if err != nil {
-		return Result{
-			Source:     src,
-			Skipped:    true,
-			SkipReason: fmt.Sprintf("cannot stat: %v", err),
-		}, true
+		return Result{Source: src, Skipped: true, SkipReason: fmt.Sprintf("cannot stat: %v", err)}, true
 	}
 
 	folder := filepath.Dir(src)
@@ -429,62 +451,28 @@ func organizeFile(src string, cfg *config.Config, dryRun bool) (Result, bool) {
 		return Result{}, false
 	}
 
-	if rule.Action != "delete" {
-		destDir := parseTemplates(rule.Destination, info)
-		targetName := info.Name()
-		if rule.Rename != "" {
-			targetName = parseTemplates(rule.Rename, info)
-		}
-		dest := filepath.Join(destDir, targetName)
-		if filepath.Clean(src) == filepath.Clean(dest) {
-			return Result{}, false
-		}
+	if isSelfMove(src, rule, info) {
+		return Result{}, false
 	}
 
-	if f, err := os.Open(src); err != nil {
-		return Result{
-			Source:     src,
-			Skipped:    true,
-			SkipReason: fmt.Sprintf("cannot open: %v", err),
-			Action:     rule.Action,
-		}, true
-	} else {
-		_ = f.Close()
+	if err := checkFileAccessible(src); err != nil {
+		return Result{Source: src, Skipped: true, SkipReason: fmt.Sprintf("cannot open: %v", err), Action: rule.Action}, true
 	}
 
 	if dryRun {
 		dest := ""
 		if rule.Action != "delete" {
-			destDir := parseTemplates(rule.Destination, info)
-			targetName := info.Name()
-			if rule.Rename != "" {
-				targetName = parseTemplates(rule.Rename, info)
-			}
-			dest = filepath.Join(destDir, targetName)
+			dest = buildRuleDest(rule, info)
 		}
-		return Result{
-			Source:      src,
-			Destination: dest,
-			Action:      rule.Action,
-		}, true
+		return Result{Source: src, Destination: dest, Action: rule.Action}, true
 	}
 
 	dest, err := processFile(src, rule, cfg.Settings.ConflictStrategy, info)
 	if err != nil {
-		return Result{
-			Source:     src,
-			Skipped:    true,
-			SkipReason: err.Error(),
-			Action:     rule.Action,
-		}, true
+		return Result{Source: src, Skipped: true, SkipReason: err.Error(), Action: rule.Action}, true
 	}
 	if dest == "" {
-		return Result{
-			Source:     src,
-			Skipped:    true,
-			SkipReason: "file already exists",
-			Action:     rule.Action,
-		}, true
+		return Result{Source: src, Skipped: true, SkipReason: "file already exists", Action: rule.Action}, true
 	}
 	return Result{Source: src, Destination: dest, Action: rule.Action}, true
 }
