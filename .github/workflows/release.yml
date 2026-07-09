@@ -68,6 +68,12 @@ jobs:
         working-directory: gui/frontend
         run: npm install
 
+      - name: Create dummy dist folder
+        shell: bash
+        run: |
+          mkdir -p gui/frontend/dist
+          touch gui/frontend/dist/index.html
+
       - name: Build Wails App (Linux)
         if: matrix.os == 'ubuntu-latest'
         run: |
