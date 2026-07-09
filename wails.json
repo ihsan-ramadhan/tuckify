@@ -10,6 +10,7 @@
   "frontend:build": "npm run build",
   "frontend:dev:watcher": "npm run dev",
   "frontend:dev:serverUrl": "auto",
+  "icon": "./gui/frontend/src/assets/images/logo.png",
   "author": {
     "name": "Muhammad Ihsan Ramadhan",
     "email": "ihsanhandsome06@gmail.com"

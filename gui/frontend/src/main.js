@@ -1,5 +1,8 @@
 import './style.css';
 import './app.css';
+import '@fontsource-variable/plus-jakarta-sans';
+import '@fontsource-variable/dm-sans';
+import '@fontsource-variable/jetbrains-mono';
 import { ICONS } from './icons.js';
 
 import {
