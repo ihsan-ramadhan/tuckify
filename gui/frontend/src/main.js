@@ -464,11 +464,14 @@ async function handleRestart(e) {
 
 async function handleLogs(e) {
 	const name = e.target.dataset.name;
+	const lines = parseInt(document.getElementById('log-lines')?.value) || 100;
+	const follow = document.getElementById('log-follow')?.checked || false;
+
 	logsTitle.textContent = `Logs for: ${name}`;
 	logsContent.textContent = 'Fetching logs...';
 	logsModal.classList.add('active');
 	try {
-		const data = await GetLogs(name, 100, false);
+		const data = await GetLogs(name, lines, follow);
 		logsContent.textContent = data || 'No logs available.';
 	} catch (err) {
 		logsContent.textContent = `Error fetching logs: ${err}`;
@@ -831,10 +834,8 @@ saveRulesBtn.addEventListener('click', async () => {
 		saveRulesBtn.innerHTML = '<span class="btn-spinner"></span> Saving...';
 		await SaveVisualRules(activeRules);
 		await SaveConflictStrategy(conflictStrategySelect.value);
-		validationAlert.className = 'alert alert-success';
-		validationAlert.textContent = 'Rules saved successfully!';
-		validationAlert.classList.remove('hidden');
-		setTimeout(() => validationAlert.classList.add('hidden'), 3000);
+		validationAlert.classList.add('hidden');
+		showToast('Rules saved successfully!', 'success');
 	} catch (err) {
 		validationAlert.className = 'alert alert-danger';
 		validationAlert.textContent = `Error: ${err}`;
@@ -978,6 +979,27 @@ document.getElementById('unstartup-all-btn').addEventListener('click', async () 
 		}
 	}, 'btn btn-primary');
 });
+
+// showToast: non-intrusive notification
+function showToast(message, type = 'success') {
+	const container = document.getElementById('toast-container');
+	if (!container) return;
+
+	const toast = document.createElement('div');
+	toast.className = `toast toast-${type}`;
+	toast.textContent = message;
+	container.appendChild(toast);
+
+	setTimeout(() => {
+		if (toast.parentNode) toast.remove();
+	}, 3000);
+}
+
+// Fetch config path on load
+GetRulesPath().then(p => {
+	const el = document.getElementById('config-path');
+	if (el && p) el.textContent = p;
+}).catch(() => {});
 
 // initial load
 loadDashboard();
