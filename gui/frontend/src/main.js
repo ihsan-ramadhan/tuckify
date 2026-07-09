@@ -509,7 +509,7 @@ async function handleRestart(e) {
 
 async function handleLogs(e) {
 	const name = e.target.dataset.name;
-	const lines = parseInt(document.getElementById('log-lines')?.value) || 100;
+	const lines = Number.parseInt(document.getElementById('log-lines')?.value) || 100;
 	const follow = document.getElementById('log-follow')?.checked || false;
 
 	logsTitle.textContent = `Logs for: ${name}`;
