@@ -25,7 +25,7 @@ jobs:
           GOOS=windows GOARCH=amd64 go build -o dist/tuckify-windows-amd64.exe ./cmd/tuckify
           GOOS=windows GOARCH=arm64 go build -o dist/tuckify-windows-arm64.exe ./cmd/tuckify
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: cli-binaries
           path: dist/*
@@ -96,7 +96,7 @@ jobs:
           mkdir -p dist-gui
           cp build/bin/tuckify-gui* dist-gui/${{ matrix.release_name }}
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: gui-binaries-${{ matrix.release_name }}
           path: dist-gui/*
