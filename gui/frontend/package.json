@@ -8,7 +8,7 @@
     "preview": "vite preview"
   },
   "devDependencies": {
-    "vite": "^5.4.14"
+    "vite": "^8.1.4"
   },
   "dependencies": {
     "@fontsource-variable/dm-sans": "^5.2.8",
