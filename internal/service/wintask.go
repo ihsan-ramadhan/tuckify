@@ -32,7 +32,7 @@ func (w *WintaskService) Install(name string, folders []string, cronExpr, config
 		return fmt.Errorf("find schtasks: %w", err)
 	}
 
-	cmd := exec.Command(winSch, "/create", "/tn", taskName, "/tr", execCmd, "/sc", "onlogon", "/f")
+	cmd := exec.Command(winSch, "/create", "/tn", taskName, "/tr", execCmd, "/sc", "onlogon", "/rl", "highest", "/f")
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("create scheduled task: %w", err)
 	}
@@ -77,13 +77,16 @@ func (w *WintaskService) Logs(name string, follow bool, lines int) error {
 }
 
 func buildWintaskCmd(name, binaryPath string, folders []string, cronExpr, configPath string) string {
-	escapedFolders := make([]string, len(folders))
-	for i, f := range folders {
-		escapedFolders[i] = fmt.Sprintf(`"%s"`, f)
+	parts := []string{
+		fmt.Sprintf(`"%s"`, binaryPath),
+		"schedule", fmt.Sprintf(`"%s"`, name),
 	}
-	execCmd := fmt.Sprintf(`"%s" schedule "%s" %s --cron "%s" --run`, binaryPath, name, strings.Join(escapedFolders, " "), cronExpr)
+	for _, f := range folders {
+		parts = append(parts, fmt.Sprintf(`"%s"`, f))
+	}
+	parts = append(parts, "--cron", fmt.Sprintf(`"%s"`, cronExpr), "--run")
 	if configPath != "" {
-		execCmd += fmt.Sprintf(` --config "%s"`, configPath)
+		parts = append(parts, "--config", fmt.Sprintf(`"%s"`, configPath))
 	}
-	return execCmd
+	return strings.Join(parts, " ")
 }
