@@ -182,6 +182,20 @@ func copyFile(src, dest string) (err error) {
 	return nil
 }
 
+// skipDirs lists directory names to skip during recursive walks
+// to avoid traversing cache, version control, and IDE directories.
+var skipDirs = map[string]bool{
+	".git":          true,
+	"node_modules":  true,
+	".cache":        true,
+	"tmp":           true,
+	"__pycache__":   true,
+	".Trash":        true,
+	".DS_Store":     true,
+	".idea":         true,
+	".vscode":       true,
+}
+
 var templateRegex = regexp.MustCompile(`\{([a-zA-Z]+)(?::([a-zA-Z]+))?\}`)
 
 func slugify(s string) string {
@@ -373,6 +387,9 @@ func listFiles(folder string, recursive bool) ([]string, error) {
 		if err != nil {
 			return err
 		}
+		if d.IsDir() && skipDirs[d.Name()] {
+			return filepath.SkipDir
+		}
 		if !d.IsDir() {
 			files = append(files, path)
 		}
@@ -386,6 +403,9 @@ func deleteEmptyDirs(root string) error {
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
+		}
+		if d.IsDir() && skipDirs[d.Name()] {
+			return filepath.SkipDir
 		}
 		if d.IsDir() && path != root {
 			dirs = append(dirs, path)
