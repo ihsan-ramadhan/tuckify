@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -24,15 +25,20 @@ func (w *WintaskService) Install(name string, folders []string, cronExpr, config
 		return fmt.Errorf("get executable path: %w", err)
 	}
 
-	execCmd := buildWintaskCmd(name, binaryPath, folders, cronExpr, configPath)
+	tuckifyCmd := buildWintaskCmd(name, binaryPath, folders, cronExpr, configPath)
 	taskName := wintaskPrefix + name
+
+	batPath, err := writeRestartBat(name, tuckifyCmd)
+	if err != nil {
+		return fmt.Errorf("write restart wrapper: %w", err)
+	}
 
 	winSch, err := exec.LookPath(schtasksCmd)
 	if err != nil {
 		return fmt.Errorf("find schtasks: %w", err)
 	}
 
-	cmd := exec.Command(winSch, "/create", "/tn", taskName, "/tr", execCmd, "/sc", "onlogon", "/rl", "highest", "/f")
+	cmd := exec.Command(winSch, "/create", "/tn", taskName, "/tr", batPath, "/sc", "onlogon", "/rl", "highest", "/f")
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("create scheduled task: %w", err)
 	}
@@ -52,6 +58,14 @@ func (w *WintaskService) Uninstall(name string) error {
 	}
 
 	_ = exec.Command(winSch, "/delete", "/tn", taskName, "/f").Run()
+
+	// remove .bat wrapper file
+	appDataDir, err := os.UserConfigDir()
+	if err == nil {
+		batPath := filepath.Join(appDataDir, "tuckify", fmt.Sprintf("tuckify-%s.bat", name))
+		_ = os.Remove(batPath)
+	}
+
 	return nil
 }
 
@@ -89,4 +103,21 @@ func buildWintaskCmd(name, binaryPath string, folders []string, cronExpr, config
 		parts = append(parts, "--config", fmt.Sprintf(`"%s"`, configPath))
 	}
 	return strings.Join(parts, " ")
+}
+
+func writeRestartBat(name, tuckifyCmd string) (string, error) {
+	appDataDir, err := os.UserConfigDir()
+	if err != nil {
+		return "", fmt.Errorf("get user config dir: %w", err)
+	}
+	batDir := filepath.Join(appDataDir, "tuckify")
+	if err := os.MkdirAll(batDir, 0o755); err != nil {
+		return "", fmt.Errorf("create bat dir: %w", err)
+	}
+	batPath := filepath.Join(batDir, fmt.Sprintf("tuckify-%s.bat", name))
+	content := fmt.Sprintf("@echo off\r\n:loop\r\n%s\r\nif %%ERRORLEVEL%% NEQ 0 (\r\n    timeout /t 5 /nobreak >nul\r\n    goto loop\r\n)", tuckifyCmd)
+	if err := os.WriteFile(batPath, []byte(content), 0o644); err != nil {
+		return "", fmt.Errorf("write bat file: %w", err)
+	}
+	return batPath, nil
 }
