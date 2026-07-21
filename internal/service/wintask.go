@@ -11,6 +11,7 @@ import (
 const (
 	schtasksCmd   = "schtasks"
 	wintaskPrefix = "tuckify-"
+	regRunKey     = `Software\Microsoft\Windows\CurrentVersion\Run`
 )
 
 type WintaskService struct{}
@@ -20,10 +21,7 @@ func NewWintaskService() *WintaskService {
 }
 
 func (w *WintaskService) Install(name string, folders []string, cronExpr, configPath string) error {
-	binaryPath, err := os.Executable()
-	if err != nil {
-		return fmt.Errorf("get executable path: %w", err)
-	}
+	binaryPath := resolveBinaryPath()
 
 	tuckifyCmd := buildWintaskCmd(name, binaryPath, folders, cronExpr, configPath)
 	taskName := wintaskPrefix + name
@@ -33,33 +31,28 @@ func (w *WintaskService) Install(name string, folders []string, cronExpr, config
 		return fmt.Errorf("write restart wrapper: %w", err)
 	}
 
-	winSch, err := exec.LookPath(schtasksCmd)
-	if err != nil {
-		return fmt.Errorf("find schtasks: %w", err)
-	}
-
-	cmd := exec.Command(winSch, "/create", "/tn", taskName, "/tr", batPath, "/sc", "onlogon", "/rl", "highest", "/f")
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("create scheduled task: %w", err)
+	if err := exec.Command("reg", "add", `HKCU\`+regRunKey, "/v", taskName, "/t", "REG_SZ", "/d", batPath, "/f").Run(); err != nil {
+		return fmt.Errorf("add to startup registry: %w", err)
 	}
 
 	return nil
 }
 
 func (w *WintaskService) Uninstall(name string) error {
-	winSch, err := exec.LookPath(schtasksCmd)
-	if err != nil {
-		return fmt.Errorf("find schtasks: %w", err)
-	}
-
 	taskName := "tuckify"
 	if name != "" {
 		taskName = wintaskPrefix + name
 	}
 
-	_ = exec.Command(winSch, "/delete", "/tn", taskName, "/f").Run()
+	// Remove from HKCU\...\Run
+	_ = exec.Command("reg", "delete", `HKCU\`+regRunKey, "/v", taskName, "/f").Run()
 
-	// remove .bat wrapper file
+	// Also try to clean up old schtasks tasks (backwards compat)
+	if winSch, err := exec.LookPath(schtasksCmd); err == nil {
+		_ = exec.Command(winSch, "/delete", "/tn", taskName, "/f").Run()
+	}
+
+	// Remove .bat wrapper file
 	appDataDir, err := os.UserConfigDir()
 	if err == nil {
 		batPath := filepath.Join(appDataDir, "tuckify", fmt.Sprintf("tuckify-%s.bat", name))
@@ -70,24 +63,23 @@ func (w *WintaskService) Uninstall(name string) error {
 }
 
 func (w *WintaskService) Exists(name string) (bool, error) {
-	winSch, err := exec.LookPath(schtasksCmd)
-	if err != nil {
-		return false, fmt.Errorf("find schtasks: %w", err)
-	}
-
 	taskName := wintaskPrefix + name
-	if err := exec.Command(winSch, "/query", "/tn", taskName).Run(); err != nil {
+	if err := exec.Command("reg", "query", `HKCU\`+regRunKey, "/v", taskName).Run(); err != nil {
 		return false, nil
 	}
 	return true, nil
 }
 
 func (w *WintaskService) CheckStatus() (string, error) {
-	return `To check status, run in cmd: schtasks /query /tn "tuckify-<name>"`, nil
+	out, err := exec.Command("reg", "query", `HKCU\`+regRunKey).Output()
+	if err != nil {
+		return "", fmt.Errorf("query startup registry: %w", err)
+	}
+	return fmt.Sprintf("Startup entries:\n%s", string(out)), nil
 }
 
 func (w *WintaskService) Logs(name string, follow bool, lines int) error {
-	return fmt.Errorf("logs not available for Windows Task Scheduler — check Event Viewer")
+	return fmt.Errorf("logs not available on Windows — check the .bat wrapper in %%APPDATA%%\\tuckify")
 }
 
 func buildWintaskCmd(name, binaryPath string, folders []string, cronExpr, configPath string) string {
@@ -103,6 +95,37 @@ func buildWintaskCmd(name, binaryPath string, folders []string, cronExpr, config
 		parts = append(parts, "--config", fmt.Sprintf(`"%s"`, configPath))
 	}
 	return strings.Join(parts, " ")
+}
+
+func resolveBinaryPath() string {
+	exe, err := os.Executable()
+	if err != nil {
+		return "tuckify" // fallback to PATH
+	}
+
+	if !strings.Contains(strings.ToLower(filepath.Base(exe)), "-gui") {
+		return exe
+	}
+
+	dir := filepath.Dir(exe)
+
+	base := filepath.Base(exe)
+	cliName := strings.ReplaceAll(strings.ReplaceAll(base, "-gui", ""), "_gui", "")
+	cliPath := filepath.Join(dir, cliName)
+	if _, err := os.Stat(cliPath); err == nil {
+		return cliPath
+	}
+
+	cliPath = filepath.Join(dir, "tuckify.exe")
+	if _, err := os.Stat(cliPath); err == nil {
+		return cliPath
+	}
+
+	if path, err := exec.LookPath("tuckify"); err == nil {
+		return path
+	}
+
+	return exe
 }
 
 func writeRestartBat(name, tuckifyCmd string) (string, error) {

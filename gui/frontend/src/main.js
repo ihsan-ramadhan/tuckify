@@ -12,7 +12,8 @@ import {
 	RunOrganize,
 	GetHistory, UndoRun, DeleteHistoryRun, ClearHistory,
 	SelectDirectory, GetLogs,
-	GetConflictStrategy, SaveConflictStrategy
+	GetConflictStrategy, SaveConflictStrategy,
+	GetRulesPath
 } from '../wailsjs/go/main/App';
 
 // state management
