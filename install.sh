@@ -29,12 +29,42 @@ done
 INSTALL_DIR="${HOME}/.local/bin"
 mkdir -p "${INSTALL_DIR}"
 
+BASE_URL="https://github.com/${REPO}/releases/download/${VERSION}"
+
+verify_checksum() {
+    file_path="$1"
+    file_name=$(basename "$file_path")
+
+    checksums_url="${BASE_URL}/checksums.txt"
+    tmp_checksums=$(mktemp)
+    if curl -fsSL "${checksums_url}" -o "${tmp_checksums}"; then
+        expected=$(grep "  ${file_name}$" "${tmp_checksums}" | awk '{print $1}')
+        rm -f "${tmp_checksums}"
+        if [ -n "$expected" ]; then
+            actual=$(sha256sum "$file_path" | awk '{print $1}')
+            if [ "$expected" != "$actual" ]; then
+                echo "Checksum verification failed for ${file_name}"
+                echo "  expected: ${expected}"
+                echo "  actual:   ${actual}"
+                rm -f "$file_path"
+                exit 1
+            fi
+            echo "Checksum verified: ${file_name}"
+        else
+            echo "Warning: ${file_name} not found in checksums.txt, skipping verification"
+        fi
+    else
+        echo "Warning: could not download checksums.txt, skipping verification"
+    fi
+}
+
 if [ "$GUI" = true ]; then
     if [ "$OS" = "darwin" ]; then
-        URL="https://github.com/${REPO}/releases/download/${VERSION}/tuckify-gui-mac-universal.zip"
+        URL="${BASE_URL}/tuckify-gui-mac-universal.zip"
         TMP_ZIP=$(mktemp)
         echo "Downloading tuckify-gui ${VERSION} for macOS..."
         curl -fsSL "${URL}" -o "${TMP_ZIP}"
+        verify_checksum "${TMP_ZIP}"
         echo "Installing to /Applications..."
         unzip -q -o "${TMP_ZIP}" -d "/Applications"
         rm -f "${TMP_ZIP}"
@@ -44,17 +74,19 @@ if [ "$GUI" = true ]; then
             echo "GUI only supports amd64 architecture on Linux currently."
             exit 1
         fi
-        URL="https://github.com/${REPO}/releases/download/${VERSION}/tuckify-gui-linux-amd64"
+        URL="${BASE_URL}/tuckify-gui-linux-amd64"
         echo "Downloading tuckify-gui ${VERSION} for Linux (amd64)..."
         curl -fsSL "${URL}" -o "${INSTALL_DIR}/tuckify-gui"
+        verify_checksum "${INSTALL_DIR}/tuckify-gui"
         chmod +x "${INSTALL_DIR}/tuckify-gui"
         echo "tuckify-gui successfully installed to ${INSTALL_DIR}/tuckify-gui"
     fi
 else
     BINARY="tuckify-${OS}-${ARCH}"
-    URL="https://github.com/${REPO}/releases/download/${VERSION}/${BINARY}"
+    URL="${BASE_URL}/${BINARY}"
     echo "Downloading tuckify ${VERSION} for ${OS}/${ARCH}..."
     curl -fsSL "${URL}" -o "${INSTALL_DIR}/tuckify"
+    verify_checksum "${INSTALL_DIR}/tuckify"
     chmod +x "${INSTALL_DIR}/tuckify"
     echo "tuckify successfully installed to ${INSTALL_DIR}/tuckify"
 fi

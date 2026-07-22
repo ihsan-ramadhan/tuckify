@@ -139,7 +139,7 @@ func writeRestartBat(name, tuckifyCmd string) (string, error) {
 	}
 	batPath := filepath.Join(batDir, fmt.Sprintf("tuckify-%s.bat", name))
 	content := fmt.Sprintf("@echo off\r\n:loop\r\n%s\r\nif %%ERRORLEVEL%% NEQ 0 (\r\n    timeout /t 5 /nobreak >nul\r\n    goto loop\r\n)", tuckifyCmd)
-	if err := os.WriteFile(batPath, []byte(content), 0o644); err != nil {
+	if err := os.WriteFile(batPath, []byte(content), 0o600); err != nil {
 		return "", fmt.Errorf("write bat file: %w", err)
 	}
 	return batPath, nil

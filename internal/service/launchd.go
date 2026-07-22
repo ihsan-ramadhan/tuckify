@@ -48,7 +48,7 @@ func (l *LaunchdService) Install(name string, folders []string, cronExpr, config
 	}
 
 	content := buildLaunchdContent(name, binaryPath, folders, cronExpr, configPath)
-	if err := os.WriteFile(plistPath, []byte(content), 0o644); err != nil {
+	if err := os.WriteFile(plistPath, []byte(content), 0o600); err != nil {
 		return fmt.Errorf("write plist file: %w", err)
 	}
 

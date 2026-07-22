@@ -66,7 +66,7 @@ func save(ss []Schedule) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(p, data, 0o644)
+	return os.WriteFile(p, data, 0o600)
 }
 
 func Upsert(s Schedule) error {

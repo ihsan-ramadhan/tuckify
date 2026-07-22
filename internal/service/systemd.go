@@ -44,7 +44,7 @@ func (s *SystemdService) Install(name string, folders []string, cronExpr, config
 	}
 
 	content := buildSystemdContent(name, binaryPath, folders, cronExpr, configPath)
-	if err := os.WriteFile(servicePath, []byte(content), 0o644); err != nil {
+	if err := os.WriteFile(servicePath, []byte(content), 0o600); err != nil {
 		return fmt.Errorf("write systemd service file: %w", err)
 	}
 
