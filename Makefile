@@ -1,9 +1,15 @@
-.PHONY: build release clean test lint install-hooks
+.PHONY: build wails wails-dev release clean test lint install-hooks
 
 BINARY_NAME=tuckify
 
 build:
 	go build -o $(BINARY_NAME) .
+
+wails:
+	wails build -tags webkit2_41
+
+wails-dev:
+	wails dev -tags webkit2_41
 
 test:
 	go test ./...

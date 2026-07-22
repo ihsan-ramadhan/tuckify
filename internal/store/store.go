@@ -2,9 +2,23 @@ package store
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 )
+
+var validNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+
+func ValidateName(name string) error {
+	if name == "" {
+		return fmt.Errorf("schedule name cannot be empty")
+	}
+	if !validNameRegex.MatchString(name) {
+		return fmt.Errorf("invalid schedule name %q: must match %s", name, validNameRegex.String())
+	}
+	return nil
+}
 
 type Schedule struct {
 	Name      string   `json:"name"`
@@ -56,6 +70,9 @@ func save(ss []Schedule) error {
 }
 
 func Upsert(s Schedule) error {
+	if err := ValidateName(s.Name); err != nil {
+		return err
+	}
 	ss, err := Load()
 	if err != nil {
 		return err
