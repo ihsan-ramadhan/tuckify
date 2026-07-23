@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 )
 
 const (
@@ -31,7 +32,7 @@ func (w *WintaskService) Install(name string, folders []string, cronExpr, config
 		return fmt.Errorf("write restart wrapper: %w", err)
 	}
 
-	if err := exec.Command("reg", "add", `HKCU\`+regRunKey, "/v", taskName, "/t", "REG_SZ", "/d", batPath, "/f").Run(); err != nil {
+	if err := cmd("reg", "add", `HKCU\`+regRunKey, "/v", taskName, "/t", "REG_SZ", "/d", batPath, "/f").Run(); err != nil {
 		return fmt.Errorf("add to startup registry: %w", err)
 	}
 
@@ -45,11 +46,11 @@ func (w *WintaskService) Uninstall(name string) error {
 	}
 
 	// Remove from HKCU\...\Run
-	_ = exec.Command("reg", "delete", `HKCU\`+regRunKey, "/v", taskName, "/f").Run()
+	_ = cmd("reg", "delete", `HKCU\`+regRunKey, "/v", taskName, "/f").Run()
 
 	// Also try to clean up old schtasks tasks (backwards compat)
 	if winSch, err := exec.LookPath(schtasksCmd); err == nil {
-		_ = exec.Command(winSch, "/delete", "/tn", taskName, "/f").Run()
+		_ = cmd(winSch, "/delete", "/tn", taskName, "/f").Run()
 	}
 
 	// Remove .bat wrapper file
@@ -64,14 +65,14 @@ func (w *WintaskService) Uninstall(name string) error {
 
 func (w *WintaskService) Exists(name string) (bool, error) {
 	taskName := wintaskPrefix + name
-	if err := exec.Command("reg", "query", `HKCU\`+regRunKey, "/v", taskName).Run(); err != nil {
+	if err := cmd("reg", "query", `HKCU\`+regRunKey, "/v", taskName).Run(); err != nil {
 		return false, nil
 	}
 	return true, nil
 }
 
 func (w *WintaskService) CheckStatus() (string, error) {
-	out, err := exec.Command("reg", "query", `HKCU\`+regRunKey).Output()
+	out, err := cmd("reg", "query", `HKCU\`+regRunKey).Output()
 	if err != nil {
 		return "", fmt.Errorf("query startup registry: %w", err)
 	}
@@ -97,6 +98,13 @@ func buildWintaskCmd(name, binaryPath string, folders []string, cronExpr, config
 	return strings.Join(parts, " ")
 }
 
+// cmd wraps exec.Command with HideWindow to prevent console window flashes.
+func cmd(name string, args ...string) *exec.Cmd {
+	c := exec.Command(name, args...)
+	c.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	return c
+}
+
 func writeRestartBat(name, tuckifyCmd string) (string, error) {
 	appDataDir, err := os.UserConfigDir()
 	if err != nil {
@@ -108,7 +116,7 @@ func writeRestartBat(name, tuckifyCmd string) (string, error) {
 	}
 	batPath := filepath.Join(batDir, fmt.Sprintf("tuckify-%s.bat", name))
 	content := fmt.Sprintf("@echo off\r\n:loop\r\n%s\r\nif %%ERRORLEVEL%% NEQ 0 (\r\n    timeout /t 5 /nobreak >nul\r\n    goto loop\r\n)", tuckifyCmd)
-	if err := os.WriteFile(batPath, []byte(content), 0o600); err != nil {
+	if err := os.WriteFile(batPath, []byte(content), 0o644); err != nil {
 		return "", fmt.Errorf("write bat file: %w", err)
 	}
 	return batPath, nil
