@@ -10,10 +10,14 @@ import (
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	wailslinux "github.com/wailsapp/wails/v2/pkg/options/linux"
 )
 
 //go:embed all:gui/frontend/dist
 var assets embed.FS
+
+//go:embed gui/frontend/src/assets/images/logo.png
+var appIcon []byte
 
 // knownCLICommands is the set of subcommands that should be dispatched
 // to the CLI cobra handler instead of launching the GUI.
@@ -43,6 +47,10 @@ func main() {
 			Assets: assets,
 		},
 		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
+		Linux: &wailslinux.Options{
+			Icon:        appIcon,
+			ProgramName: "tuckify",
+		},
 		OnStartup:        app.startup,
 		Bind: []interface{}{
 			app,
