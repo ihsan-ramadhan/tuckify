@@ -35,8 +35,24 @@ var uninstallCmd = &cobra.Command{
 			} else {
 				fmt.Fprintf(os.Stderr, "Warning: failed to delete binary: %v\n", err)
 			}
+
+			dir := filepath.Dir(binaryPath)
+			for _, partner := range []string{"tuckify", "tuckify-gui"} {
+				partnerPath := filepath.Join(dir, partner)
+				if partnerPath != binaryPath {
+					_ = os.Remove(partnerPath)
+				}
+			}
 		} else {
 			fmt.Fprintln(os.Stderr, "Warning: failed to find running binary path.")
+		}
+
+		homeDir, err := os.UserHomeDir()
+		if err == nil {
+			desktopFile := filepath.Join(homeDir, ".local", "share", "applications", "tuckify.desktop")
+			_ = os.Remove(desktopFile)
+			iconFile := filepath.Join(homeDir, ".local", "share", "icons", "hicolor", "512x512", "apps", "tuckify.png")
+			_ = os.Remove(iconFile)
 		}
 
 		configDir := filepath.Dir(config.DefaultConfigPath())

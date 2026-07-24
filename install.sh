@@ -80,6 +80,28 @@ if [ "$GUI" = true ]; then
         verify_checksum "${INSTALL_DIR}/tuckify-gui"
         chmod +x "${INSTALL_DIR}/tuckify-gui"
         echo "tuckify-gui successfully installed to ${INSTALL_DIR}/tuckify-gui"
+
+        # Create desktop shortcut for Linux GUI integration
+        echo "Creating desktop shortcut and installing application icon..."
+        ICON_DIR="${HOME}/.local/share/icons/hicolor/512x512/apps"
+        mkdir -p "${ICON_DIR}"
+        curl -fsSL "https://raw.githubusercontent.com/${REPO}/main/gui/frontend/src/assets/images/logo.png" -o "${ICON_DIR}/tuckify.png"
+
+        APPS_DIR="${HOME}/.local/share/applications"
+        mkdir -p "${APPS_DIR}"
+        cat <<EOF > "${APPS_DIR}/tuckify.desktop"
+[Desktop Entry]
+Type=Application
+Name=tuckify
+Comment=Go-based CLI/GUI file organizer
+Exec=${INSTALL_DIR}/tuckify-gui
+Icon=tuckify
+Terminal=false
+Categories=Utility;System;
+StartupWMClass=tuckify
+EOF
+        chmod +x "${APPS_DIR}/tuckify.desktop"
+        echo "Desktop shortcut created at ${APPS_DIR}/tuckify.desktop"
     fi
 else
     BINARY="tuckify-${OS}-${ARCH}"

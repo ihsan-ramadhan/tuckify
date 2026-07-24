@@ -25,7 +25,7 @@ Installs to `~/.local/bin/tuckify`. Make sure `~/.local/bin` is in your `PATH`.
 curl -fsSL https://raw.githubusercontent.com/ihsan-ramadhan/tuckify/main/install.sh | sh -s -- --gui
 ```
 - On **macOS**, this downloads and installs `tuckify-gui.app` directly into your `/Applications` folder.
-- On **Linux**, this installs the GUI binary to `~/.local/bin/tuckify-gui`.
+- On **Linux**, this installs the GUI binary to `~/.local/bin/tuckify-gui`, registers the application icon, and creates a desktop shortcut (`~/.local/share/applications/tuckify.desktop`) so it appears in your application launcher/dock.
 
 ### Windows
 
@@ -203,9 +203,11 @@ See [`rules.example.toml`](rules.example.toml) for complete examples.
 
 ```bash
 tuckify uninstall
+# or if you only installed the GUI:
+tuckify-gui uninstall
 ```
 
-Removes the binary and services. Prompts whether to also delete `~/.tuckify/`.
+Removes the binary, system services, and desktop integration files (Linux `.desktop` and icons). Prompts whether to also delete `~/.tuckify/`.
 
 ---
 
