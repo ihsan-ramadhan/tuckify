@@ -122,7 +122,7 @@ func TestUndoByID(t *testing.T) {
 		t.Fatalf("expected 2 runs, got %d", len(runs))
 	}
 
-	// Undo run 1 (oldest) — will fail because files don't exist, but should not error out
+	// Undo run 1 (oldest) — will fail because files don't exist, count=0
 	n, err := Undo(1)
 	if err != nil {
 		t.Fatal(err)
@@ -131,9 +131,9 @@ func TestUndoByID(t *testing.T) {
 		t.Logf("expected 0 reverted (files don't exist), got %d", n)
 	}
 
-	// run_1.json should be deleted
-	if _, err := os.Stat(filepath.Join(dir, "run_1.json")); !os.IsNotExist(err) {
-		t.Fatal("run_1.json should be deleted")
+	// run_1.json should NOT be deleted (0 reverts — preserve audit trail)
+	if _, err := os.Stat(filepath.Join(dir, "run_1.json")); os.IsNotExist(err) {
+		t.Fatal("run_1.json should still exist when 0 files reverted")
 	}
 
 	// run_2.json should still exist

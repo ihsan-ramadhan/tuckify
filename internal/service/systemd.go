@@ -33,10 +33,7 @@ func systemdServiceDir() string {
 }
 
 func (s *SystemdService) Install(name string, folders []string, cronExpr, configPath string) error {
-	binaryPath, err := os.Executable()
-	if err != nil {
-		return fmt.Errorf("get executable path: %w", err)
-	}
+	binaryPath := resolveBinaryPath()
 
 	servicePath := systemdServicePath(name)
 	if err := os.MkdirAll(filepath.Dir(servicePath), 0o755); err != nil {
@@ -155,7 +152,7 @@ func buildSystemdContent(name, binaryPath string, folders []string, cronExpr, co
 	for i, f := range folders {
 		escapedFolders[i] = fmt.Sprintf("%q", f)
 	}
-	execStart := fmt.Sprintf("%s schedule %s %s --cron %q --run", binaryPath, name, strings.Join(escapedFolders, " "), cronExpr)
+	execStart := fmt.Sprintf("%s schedule %s %s --cron %q --run --force", binaryPath, name, strings.Join(escapedFolders, " "), cronExpr)
 	if configPath != "" {
 		execStart += fmt.Sprintf(" --config %q", configPath)
 	}

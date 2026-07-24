@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ihsan-ramadhan/tuckify/internal/config"
+	"github.com/ihsan-ramadhan/tuckify/internal/history"
 	"github.com/ihsan-ramadhan/tuckify/internal/organizer"
 	"github.com/ihsan-ramadhan/tuckify/internal/store"
 	"github.com/robfig/cron/v3"
@@ -49,6 +50,21 @@ func runTick(name string, folders []string, configPath string) ([]organizer.Resu
 			return nil, fmt.Errorf("organize %q: %w", folder, err)
 		}
 		allResults = append(allResults, results...)
+	}
+
+	// save history for undo (tick is never a dry-run)
+	var histEntries []history.Entry
+	for _, r := range allResults {
+		if !r.Skipped && (r.Action == "" || r.Action == "move") {
+			histEntries = append(histEntries, history.Entry{
+				Src:    r.Source,
+				Dest:   r.Destination,
+				Action: "move",
+			})
+		}
+	}
+	if len(histEntries) > 0 {
+		_ = history.Save(folders, histEntries)
 	}
 
 	return allResults, nil

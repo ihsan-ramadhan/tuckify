@@ -37,10 +37,7 @@ func launchdLabel(name string) string {
 }
 
 func (l *LaunchdService) Install(name string, folders []string, cronExpr, configPath string) error {
-	binaryPath, err := os.Executable()
-	if err != nil {
-		return fmt.Errorf("get executable path: %w", err)
-	}
+	binaryPath := resolveBinaryPath()
 
 	plistPath := launchdPlistPath(name)
 	if err := os.MkdirAll(filepath.Dir(plistPath), 0o755); err != nil {
@@ -134,6 +131,7 @@ func buildLaunchdContent(name, binaryPath string, folders []string, cronExpr, co
 	argsXml.WriteString("        <string>--cron</string>\n")
 	fmt.Fprintf(&argsXml, "        <string>%s</string>\n", cronExpr)
 	argsXml.WriteString("        <string>--run</string>\n")
+	argsXml.WriteString("        <string>--force</string>\n")
 
 	if configPath != "" {
 		argsXml.WriteString("        <string>--config</string>\n")

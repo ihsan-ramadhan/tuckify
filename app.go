@@ -292,16 +292,9 @@ func (a *App) GetSchedules() ([]scheduleView, error) {
 }
 
 func (a *App) SaveSchedule(name string, folders []string, cronExpr string, configPath string, recursive, yes bool) error {
-	folderStr := ""
-	if len(folders) > 0 {
-		folderStr = folders[0]
-		for i := 1; i < len(folders); i++ {
-			folderStr += "," + folders[i]
-		}
-	}
 	return store.Upsert(store.Schedule{
 		Name:      name,
-		Folder:    folderStr,
+		Folders:   folders,
 		Cron:      cronExpr,
 		Config:    configPath,
 		Recursive: recursive,

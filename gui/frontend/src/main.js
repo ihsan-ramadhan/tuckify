@@ -540,7 +540,7 @@ async function handleEdit(e) {
 			schedFolders = [...(s.folders || [])];
 			renderSchedPills();
 			schedConfig.value = s.config || '';
-			if (schedRecursive) schedRecursive.checked = s.recursive ?? true;
+			if (schedRecursive) schedRecursive.checked = s.recursive ?? false;
 
 			const presets = ['0 * * * *', '0 */6 * * *', '0 12 * * *', '0 0 * * *', '0 0 * * 0', '0 0 1 * *'];
 			if (presets.includes(s.cron)) {

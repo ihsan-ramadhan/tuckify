@@ -48,7 +48,7 @@ Description=tuckify file organizer (downloads)
 After=default.target
 
 [Service]
-ExecStart=/usr/bin/tuckify schedule downloads "/data" --cron "0 9 * * *" --run --config "/etc/tuckify.toml"
+ExecStart=/usr/bin/tuckify schedule downloads "/data" --cron "0 9 * * *" --run --force --config "/etc/tuckify.toml"
 Restart=on-failure
 RestartSec=5s
 
@@ -65,7 +65,7 @@ Description=tuckify file organizer (downloads)
 After=default.target
 
 [Service]
-ExecStart=/usr/bin/tuckify schedule downloads "/data" --cron "0 9 * * *" --run
+ExecStart=/usr/bin/tuckify schedule downloads "/data" --cron "0 9 * * *" --run --force
 Restart=on-failure
 RestartSec=5s
 
@@ -100,6 +100,7 @@ func TestLaunchdContent(t *testing.T) {
         <string>--cron</string>
         <string>0 9 * * *</string>
         <string>--run</string>
+        <string>--force</string>
         <string>--config</string>
         <string>/etc/tuckify.toml</string>
     </array>
@@ -130,6 +131,7 @@ func TestLaunchdContent(t *testing.T) {
         <string>--cron</string>
         <string>0 9 * * *</string>
         <string>--run</string>
+        <string>--force</string>
     </array>
     <key>KeepAlive</key>
     <true/>
@@ -151,13 +153,13 @@ func TestCrontabUpsert(t *testing.T) {
 	name := "downloads"
 
 	result := upsertCrontabContent(initial, name, binary, folders, cronExpr, "/etc/tuckify.toml")
-	expected := "* * * * * old-job\n0 9 * * * /usr/bin/tuckify schedule downloads \"/data\" --cron \"0 9 * * *\" --run --config \"/etc/tuckify.toml\" # tuckify-managed:downloads\n"
+	expected := "* * * * * old-job\n0 9 * * * /usr/bin/tuckify schedule downloads \"/data\" --cron \"0 9 * * *\" --run --force --config \"/etc/tuckify.toml\" # tuckify-managed:downloads\n"
 	if result != expected {
 		t.Errorf("expected %q, got %q", expected, result)
 	}
 
 	resultNoCfg := upsertCrontabContent(initial, name, binary, folders, cronExpr, "")
-	expectedNoCfg := "* * * * * old-job\n0 9 * * * /usr/bin/tuckify schedule downloads \"/data\" --cron \"0 9 * * *\" --run # tuckify-managed:downloads\n"
+	expectedNoCfg := "* * * * * old-job\n0 9 * * * /usr/bin/tuckify schedule downloads \"/data\" --cron \"0 9 * * *\" --run --force # tuckify-managed:downloads\n"
 	if resultNoCfg != expectedNoCfg {
 		t.Errorf("expected %q, got %q", expectedNoCfg, resultNoCfg)
 	}
@@ -202,19 +204,19 @@ func TestCrontabRemove(t *testing.T) {
 
 func TestWintaskCmd(t *testing.T) {
 	name := "downloads"
-	binary := `C:	uckify.exe`
+	binary := `C:\tuckify.exe`
 	folders := []string{`C:\data`}
 	cronExpr := "0 9 * * *"
 	cfgPath := `C:\config.toml`
 
 	cmd := buildWintaskCmd(name, binary, folders, cronExpr, cfgPath)
-	expected := `"` + binary + `" schedule "` + name + `" "` + folders[0] + `" --cron "` + cronExpr + `" --run` + ` --config "` + cfgPath + `"`
+	expected := `"` + binary + `" schedule "` + name + `" "` + folders[0] + `" --cron "` + cronExpr + `" --run --force` + ` --config "` + cfgPath + `"`
 	if cmd != expected {
 		t.Errorf("expected %q, got %q", expected, cmd)
 	}
 
 	cmdNoCfg := buildWintaskCmd(name, binary, folders, cronExpr, "")
-	expectedNoCfg := `"` + binary + `" schedule "` + name + `" "` + folders[0] + `" --cron "` + cronExpr + `" --run`
+	expectedNoCfg := `"` + binary + `" schedule "` + name + `" "` + folders[0] + `" --cron "` + cronExpr + `" --run --force`
 	if cmdNoCfg != expectedNoCfg {
 		t.Errorf("expected %q, got %q", expectedNoCfg, cmdNoCfg)
 	}

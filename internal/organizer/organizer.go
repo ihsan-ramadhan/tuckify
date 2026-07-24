@@ -122,7 +122,7 @@ func askConflictStrategy(src, dest string) (string, error) {
 	}
 }
 
-func resolveDest(destDir, targetName, conflictStrategy string) (string, error) {
+func resolveDest(src, destDir, targetName, conflictStrategy string) (string, error) {
 	dest := filepath.Join(destDir, targetName)
 	if _, err := os.Stat(dest); os.IsNotExist(err) {
 		return dest, nil
@@ -134,7 +134,7 @@ func resolveDest(destDir, targetName, conflictStrategy string) (string, error) {
 	case "overwrite":
 		return dest, nil
 	case "ask":
-		choice, err := askConflictStrategy(dest, dest)
+		choice, err := askConflictStrategy(src, dest)
 		if err != nil {
 			return "", err
 		}
@@ -174,9 +174,15 @@ func copyFile(src, dest string) (err error) {
 	if err != nil {
 		return err
 	}
-	defer func() { _ = out.Close() }()
 
-	if _, err := io.Copy(out, in); err != nil {
+	defer func() {
+		_ = out.Close()
+		if err != nil {
+			_ = os.Remove(dest)
+		}
+	}()
+
+	if _, err = io.Copy(out, in); err != nil {
 		return err
 	}
 	return nil
@@ -341,7 +347,7 @@ func buildAndResolveDest(src string, rule *config.Rule, conflictStrategy string,
 		}
 	}
 
-	resolvedDest, err := resolveDest(destDir, targetName, conflictStrategy)
+	resolvedDest, err := resolveDest(src, destDir, targetName, conflictStrategy)
 	return resolvedDest, false, err
 }
 
@@ -516,7 +522,3 @@ func Organize(folder string, cfg *config.Config, dryRun bool, recursive bool) ([
 
 	return results, nil
 }
-
-// HistoryWriter is set by cmd layer to persist undo history.
-// ponytail: func var so callers (cmd/run.go) can inject without import cycle.
-var HistoryWriter func(results []Result) error

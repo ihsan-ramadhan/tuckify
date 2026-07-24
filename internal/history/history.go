@@ -207,9 +207,11 @@ func Undo(id int) (int, error) {
 		}
 	}
 
-	// Remove the run history file
-	p := filepath.Join(historyDir(), fmt.Sprintf("run_%d.json", target.ID))
-	_ = os.Remove(p)
+	// Only remove history file if at least one file was reverted
+	if count > 0 {
+		p := filepath.Join(historyDir(), fmt.Sprintf("run_%d.json", target.ID))
+		_ = os.Remove(p)
+	}
 
 	return count, nil
 }

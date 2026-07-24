@@ -90,42 +90,11 @@ func buildWintaskCmd(name, binaryPath string, folders []string, cronExpr, config
 	for _, f := range folders {
 		parts = append(parts, fmt.Sprintf(`"%s"`, f))
 	}
-	parts = append(parts, "--cron", fmt.Sprintf(`"%s"`, cronExpr), "--run")
+	parts = append(parts, "--cron", fmt.Sprintf(`"%s"`, cronExpr), "--run", "--force")
 	if configPath != "" {
 		parts = append(parts, "--config", fmt.Sprintf(`"%s"`, configPath))
 	}
 	return strings.Join(parts, " ")
-}
-
-func resolveBinaryPath() string {
-	exe, err := os.Executable()
-	if err != nil {
-		return "tuckify" // fallback to PATH
-	}
-
-	if !strings.Contains(strings.ToLower(filepath.Base(exe)), "-gui") {
-		return exe
-	}
-
-	dir := filepath.Dir(exe)
-
-	base := filepath.Base(exe)
-	cliName := strings.ReplaceAll(strings.ReplaceAll(base, "-gui", ""), "_gui", "")
-	cliPath := filepath.Join(dir, cliName)
-	if _, err := os.Stat(cliPath); err == nil {
-		return cliPath
-	}
-
-	cliPath = filepath.Join(dir, "tuckify.exe")
-	if _, err := os.Stat(cliPath); err == nil {
-		return cliPath
-	}
-
-	if path, err := exec.LookPath("tuckify"); err == nil {
-		return path
-	}
-
-	return exe
 }
 
 func writeRestartBat(name, tuckifyCmd string) (string, error) {
