@@ -17,6 +17,7 @@ import (
 	"github.com/ihsan-ramadhan/tuckify/internal/organizer"
 	"github.com/ihsan-ramadhan/tuckify/internal/service"
 	"github.com/ihsan-ramadhan/tuckify/internal/store"
+	"github.com/robfig/cron/v3"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -528,4 +529,11 @@ func (a *App) SaveConflictStrategy(strategy string) error {
 	}
 
 	return os.WriteFile(p, buf.Bytes(), 0644)
+}
+
+func (a *App) ValidateCron(expr string) (string, error) {
+	if _, err := cron.ParseStandard(expr); err != nil {
+		return err.Error(), nil
+	}
+	return "", nil
 }

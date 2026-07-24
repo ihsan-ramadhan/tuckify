@@ -13,7 +13,8 @@ import {
 	GetHistory, UndoRun, DeleteHistoryRun, ClearHistory,
 	SelectDirectory, GetLogs,
 	GetConflictStrategy, SaveConflictStrategy,
-	GetRulesPath
+	GetRulesPath,
+	ValidateCron
 } from '../wailsjs/go/main/App';
 
 // state management
@@ -226,8 +227,8 @@ runFolderInput.addEventListener('keydown', (e) => {
 
 // Generate custom cron field dropdowns
 function buildCronFieldOptions() {
-	const minuteOpts = ['*', '0', '5', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55'];
-	const hourOpts = ['*', ...Array.from({length: 24}, (_, i) => String(i))];
+	const minuteOpts = ['*', '0', '5', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55', '*/2', '*/5', '*/10', '*/15', '*/30', '0,30'];
+	const hourOpts = ['*', ...Array.from({length: 24}, (_, i) => String(i)), '*/2', '*/4', '*/6', '*/12', '0,12', '9,17'];
 	const dayOpts = ['*', ...Array.from({length: 31}, (_, i) => String(i + 1))];
 	const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -236,7 +237,7 @@ function buildCronFieldOptions() {
 		{ key: 'hour', label: 'Hour', opts: hourOpts },
 		{ key: 'day', label: 'Day', opts: dayOpts },
 		{ key: 'month', label: 'Month', opts: ['*', ...Array.from({length: 12}, (_, i) => String(i + 1))], labels: ['*', ...monthNames] },
-		{ key: 'weekday', label: 'Weekday', opts: ['*', '0','1','2','3','4','5','6'], labels: ['Every','Sun','Mon','Tue','Wed','Thu','Fri','Sat'] },
+		{ key: 'weekday', label: 'Weekday', opts: ['*','0','1','2','3','4','5','6','1-5','0,6','1,3,5'], labels: ['Every','Sun','Mon','Tue','Wed','Thu','Fri','Sat','Mon–Fri','Sat,Sun','M/W/Fri'] },
 	];
 
 	cronFieldsContainer.innerHTML = fields.map(f => `
@@ -277,21 +278,77 @@ function setCronFields(cronExpr) {
 	updateCronPreview();
 }
 
-function updateCronPreview() {
-	document.getElementById('cron-preview-value').textContent = getCronFromFields();
-}
-
 buildCronFieldOptions();
 
 // cron option change helper
 schedCron.addEventListener('change', () => {
-	if (schedCron.value === 'custom') {
-		customCronGroup.classList.remove('hidden');
-		updateCronPreview();
-	} else {
-		customCronGroup.classList.add('hidden');
-	}
+	customCronGroup.classList.toggle('hidden', schedCron.value !== 'custom');
+	const raw = document.getElementById('raw-cron-group');
+	raw.classList.toggle('hidden', schedCron.value !== 'advanced');
+	if (schedCron.value === 'custom') updateCronPreview();
+	if (schedCron.value === 'advanced') updateCronRawPreview();
 });
+
+const cronRawInput = document.getElementById('cron-raw');
+cronRawInput.addEventListener('input', updateCronRawPreview);
+
+// describeCron turns a 5-field expr into a human sentence for common shapes.
+// combos fall back to showing the raw expr. Full grammar not worth a lib here.
+function describeCron(expr) {
+	if (!expr || expr.trim() === '') return '';
+	const p = expr.trim().split(/\s+/);
+	if (p.length !== 5) return '';
+	const [min, hr, dom, mon, dow] = p;
+	const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+	const dowText = v => {
+		if (v === '*') return 'day';
+		if (v === '1-5') return 'weekday';
+		if (v === '0,6') return 'weekend';
+		const single = /^[0-6]$/.test(v);
+		if (single) return days[+v];
+		return v;
+	};
+	const atTime = () => {
+		if (/^\d+$/.test(hr) && /^\d+$/.test(min)) return ` at ${hr.padStart(2,'0')}:${min.padStart(2,'0')}`;
+		return '';
+	};
+	// every N minutes
+	if (/^\*\/(\d+)$/.test(min) && hr === '*' && dom === '*' && mon === '*' && dow === '*') {
+		return `Every ${RegExp.$1} minutes`;
+	}
+	// every N hours
+	if (min === '0' && /^\*\/(\d+)$/.test(hr) && dom === '*' && mon === '*' && dow === '*') {
+		return `Every ${RegExp.$1} hours`;
+	}
+	// daily at HH:MM
+	if (/^\d+$/.test(min) && /^\d+$/.test(hr) && dom === '*' && mon === '*' && dow === '*') {
+		return `Every day${atTime()}`;
+	}
+	// weekly — single/list/range weekday, fixed time
+	if (/^\d+$/.test(min) && /^\d+$/.test(hr) && dom === '*' && mon === '*' && dow !== '*') {
+		return `Every ${dowText(dow)}${atTime()}`;
+	}
+	// monthly — fixed day + time
+	if (/^\d+$/.test(min) && /^\d+$/.test(hr) && /^\d+$/.test(dom) && mon === '*' && dow === '*') {
+		return `Monthly on day ${dom}${atTime()}`;
+	}
+	return `(${expr})`;
+}
+
+function updateCronPreview() {
+	const expr = getCronFromFields();
+	document.getElementById('cron-preview-value').textContent = expr;
+	document.getElementById('cron-human').textContent = describeCron(expr);
+}
+
+async function updateCronRawPreview() {
+	const expr = cronRawInput.value.trim();
+	document.getElementById('cron-raw-value').textContent = expr;
+	document.getElementById('cron-raw-human').textContent = describeCron(expr);
+	const err = await ValidateCron(expr);
+	const hint = document.getElementById('cron-raw-human');
+	if (expr && err) hint.textContent = `invalid: ${err}`;
+}
 
 // schedules
 function getLastRunLabel(runs) {
@@ -365,13 +422,8 @@ function renderSchedules(schedules) {
 		}
 
 		// pretty format cron
-		let cronLabel = s.cron;
-		if (s.cron === '0 * * * *') cronLabel = 'Every Hour';
-		else if (s.cron === '0 */6 * * *') cronLabel = 'Every 6 Hours';
-		else if (s.cron === '0 12 * * *') cronLabel = 'Daily at Noon';
-		else if (s.cron === '0 0 * * *') cronLabel = 'Daily at Midnight';
-		else if (s.cron === '0 0 * * 0') cronLabel = 'Weekly (Sunday)';
-		else if (s.cron === '0 0 1 * *') cronLabel = 'Monthly (1st)';
+		let cronLabel = describeCron(s.cron);
+		if (!cronLabel) cronLabel = s.cron || '—';
 
 		card.innerHTML = `
 			<div>
@@ -447,6 +499,8 @@ addSchedBtn.addEventListener('click', () => {
 	schedFolders = [];
 	renderSchedPills();
 	customCronGroup.classList.add('hidden');
+	document.getElementById('raw-cron-group')?.classList.add('hidden');
+	cronRawInput.value = '';
 	schedModal.classList.add('active');
 });
 
@@ -461,6 +515,13 @@ schedForm.addEventListener('submit', async (e) => {
 	let cron = schedCron.value;
 	if (cron === 'custom') {
 		cron = getCronFromFields();
+	} else if (cron === 'advanced') {
+		cron = cronRawInput.value.trim();
+		const err = await ValidateCron(cron);
+		if (err) {
+			showAlert(`Invalid cron expression: ${err}`);
+			return;
+		}
 	}
 
 	const configPath = schedConfig.value.trim();
@@ -546,10 +607,21 @@ async function handleEdit(e) {
 			if (presets.includes(s.cron)) {
 				schedCron.value = s.cron;
 				customCronGroup.classList.add('hidden');
+				document.getElementById('raw-cron-group')?.classList.add('hidden');
 			} else {
+				// try dropdown mode; if fields don't map cleanly, fall back to raw
 				schedCron.value = 'custom';
-				customCronGroup.classList.remove('hidden');
 				setCronFields(s.cron);
+				if (getCronFromFields() === s.cron) {
+					customCronGroup.classList.remove('hidden');
+					document.getElementById('raw-cron-group')?.classList.add('hidden');
+				} else {
+					schedCron.value = 'advanced';
+					customCronGroup.classList.add('hidden');
+					document.getElementById('raw-cron-group')?.classList.remove('hidden');
+					cronRawInput.value = s.cron;
+					updateCronRawPreview();
+				}
 			}
 			schedModal.classList.add('active');
 		}

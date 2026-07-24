@@ -121,6 +121,7 @@
                                         <option value="0 0 * * 0">Every Week (Sunday)</option>
                                         <option value="0 0 1 * *">Every Month (1st)</option>
                                         <option value="custom">Custom...</option>
+                                        <option value="advanced">Advanced (raw)...</option>
                                     </select>
                                 </div>
                                 <div id="custom-cron-group" class="cron-builder hidden">
@@ -130,8 +131,17 @@
                                     </div>					<div class="cron-preview">
 						<span class="cron-preview-label">Cron expression:</span>
 						<code id="cron-preview-value">* * * * *</code>
+						<span id="cron-human" class="cron-human"></span>
 					</div>
 				</div>
+                                <div id="raw-cron-group" class="cron-builder hidden" style="margin-top:10px;">
+                                    <input type="text" id="cron-raw" class="form-control" placeholder="0 9 * * 1-5" style="font-family:var(--font-mono,monospace);">
+                                    <div class="cron-preview" style="margin-top:6px;">
+                                        <span class="cron-preview-label">Cron expression:</span>
+                                        <code id="cron-raw-value"></code>
+                                        <span id="cron-raw-human" class="cron-human"></span>
+                                    </div>
+                                </div>
                                 <div class="form-group" style="display:flex; gap:24px; margin-top:8px;">
                                     <label class="checkbox-label">
                                         <input type="checkbox" id="sched-recursive" checked>
