@@ -151,6 +151,14 @@ func Run(name string, folders []string, expr, configPath string) error {
 	c.Start()
 	fmt.Printf("scheduler started — press Ctrl+C to stop\n")
 
+	results, errTick := runTick(name, folders, configPath)
+	if errTick != nil {
+		fmt.Fprintf(os.Stderr, "initial run error: %v\n", errTick)
+	} else {
+		printTickResults(results)
+		fmt.Println(summarizeTickResults(results))
+	}
+
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit

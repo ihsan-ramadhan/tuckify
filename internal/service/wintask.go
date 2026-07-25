@@ -23,42 +23,70 @@ func NewWintaskService() *WintaskService {
 }
 
 func (w *WintaskService) Install(name string, folders []string, cronExpr, configPath string) error {
-	binaryPath := resolveBinaryPath()
+	_ = w.Uninstall(name)
 
+	binaryPath := resolveBinaryPath()
 	tuckifyCmd := buildWintaskCmd(name, binaryPath, folders, cronExpr, configPath)
 	taskName := wintaskPrefix + name
 
-	batPath, err := writeRestartBat(name, tuckifyCmd)
+	batPath, _, err := writeRestartBat(name, tuckifyCmd)
 	if err != nil {
 		return fmt.Errorf("write restart wrapper: %w", err)
 	}
 
-	if err := cmd("reg", "add", `HKCU\`+regRunKey, "/v", taskName, "/t", "REG_SZ", "/d", batPath, "/f").Run(); err != nil {
+	if err := cmd("reg", "add", `HKCU\`+regRunKey, "/v", taskName, "/t", "REG_SZ", "/d", fmt.Sprintf(`"%s"`, batPath), "/f").Run(); err != nil {
 		return fmt.Errorf("add to startup registry: %w", err)
+	}
+
+	c := exec.Command("cmd.exe", "/c", batPath)
+	c.SysProcAttr = &syscall.SysProcAttr{
+		HideWindow:    true,
+		CreationFlags: 0x08000000, // CREATE_NO_WINDOW
+	}
+	if err := c.Start(); err != nil {
+		return fmt.Errorf("start background service process: %w", err)
 	}
 
 	return nil
 }
 
 func (w *WintaskService) Uninstall(name string) error {
-	taskName := "tuckify"
 	if name != "" {
-		taskName = wintaskPrefix + name
-	}
+		taskName := wintaskPrefix + name
 
-	// Remove from HKCU\...\Run
-	_ = cmd("reg", "delete", `HKCU\`+regRunKey, "/v", taskName, "/f").Run()
+		psCmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command",
+			fmt.Sprintf("Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*tuckify-%s.bat*' -or $_.CommandLine -like '*schedule*%s*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }", name, name))
+		psCmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
+		_ = psCmd.Run()
 
-	// Also try to clean up old schtasks tasks (backwards compat)
-	if winSch, err := exec.LookPath(schtasksCmd); err == nil {
-		_ = cmd(winSch, "/delete", "/tn", taskName, "/f").Run()
-	}
+		_ = cmd("reg", "delete", `HKCU\`+regRunKey, "/v", taskName, "/f").Run()
 
-	// Remove .bat wrapper file
-	appDataDir, err := os.UserConfigDir()
-	if err == nil {
-		batPath := filepath.Join(appDataDir, "tuckify", fmt.Sprintf("tuckify-%s.bat", name))
-		_ = os.Remove(batPath)
+		if winSch, err := exec.LookPath(schtasksCmd); err == nil {
+			_ = cmd(winSch, "/delete", "/tn", taskName, "/f").Run()
+		}
+
+		appDataDir, err := os.UserConfigDir()
+		if err == nil {
+			batPath := filepath.Join(appDataDir, "tuckify", fmt.Sprintf("tuckify-%s.bat", name))
+			_ = os.Remove(batPath)
+		}
+	} else {
+		psCmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command",
+			"Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*tuckify-*.bat*' -or $_.CommandLine -like '*schedule*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }")
+		psCmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
+		_ = psCmd.Run()
+
+		appDataDir, err := os.UserConfigDir()
+		if err == nil {
+			entries, _ := os.ReadDir(filepath.Join(appDataDir, "tuckify"))
+			for _, e := range entries {
+				if strings.HasPrefix(e.Name(), "tuckify-") && strings.HasSuffix(e.Name(), ".bat") {
+					schedName := strings.TrimSuffix(strings.TrimPrefix(e.Name(), "tuckify-"), ".bat")
+					_ = cmd("reg", "delete", `HKCU\`+regRunKey, "/v", wintaskPrefix+schedName, "/f").Run()
+					_ = os.Remove(filepath.Join(appDataDir, "tuckify", e.Name()))
+				}
+			}
+		}
 	}
 
 	return nil
@@ -81,7 +109,22 @@ func (w *WintaskService) CheckStatus() (string, error) {
 }
 
 func (w *WintaskService) Logs(name string, follow bool, lines int) error {
-	return fmt.Errorf("logs not available on Windows — check the .bat wrapper in %%APPDATA%%\\tuckify")
+	appDataDir, err := os.UserConfigDir()
+	if err != nil {
+		return fmt.Errorf("get user config dir: %w", err)
+	}
+	logPath := filepath.Join(appDataDir, "tuckify", fmt.Sprintf("tuckify-%s.log", name))
+	data, err := os.ReadFile(logPath)
+	if err != nil {
+		return fmt.Errorf("read log file: %w", err)
+	}
+
+	allLines := strings.Split(strings.ReplaceAll(string(data), "\r\n", "\n"), "\n")
+	if len(allLines) > lines {
+		allLines = allLines[len(allLines)-lines:]
+	}
+	fmt.Println(strings.Join(allLines, "\n"))
+	return nil
 }
 
 func buildWintaskCmd(name, binaryPath string, folders []string, cronExpr, configPath string) string {
@@ -102,23 +145,25 @@ func buildWintaskCmd(name, binaryPath string, folders []string, cronExpr, config
 // cmd wraps exec.Command with HideWindow to prevent console window flashes.
 func cmd(name string, args ...string) *exec.Cmd {
 	c := exec.Command(name, args...)
-	c.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	c.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
 	return c
 }
 
-func writeRestartBat(name, tuckifyCmd string) (string, error) {
+func writeRestartBat(name, tuckifyCmd string) (string, string, error) {
 	appDataDir, err := os.UserConfigDir()
 	if err != nil {
-		return "", fmt.Errorf("get user config dir: %w", err)
+		return "", "", fmt.Errorf("get user config dir: %w", err)
 	}
 	batDir := filepath.Join(appDataDir, "tuckify")
 	if err := os.MkdirAll(batDir, 0o755); err != nil {
-		return "", fmt.Errorf("create bat dir: %w", err)
+		return "", "", fmt.Errorf("create bat dir: %w", err)
 	}
 	batPath := filepath.Join(batDir, fmt.Sprintf("tuckify-%s.bat", name))
-	content := fmt.Sprintf("@echo off\r\n:loop\r\n%s\r\nif %%ERRORLEVEL%% NEQ 0 (\r\n    timeout /t 5 /nobreak >nul\r\n    goto loop\r\n)", tuckifyCmd)
+	logPath := filepath.Join(batDir, fmt.Sprintf("tuckify-%s.log", name))
+
+	content := fmt.Sprintf("@echo off\r\n:loop\r\n%s >> \"%s\" 2>&1\r\nif %%ERRORLEVEL%% NEQ 0 (\r\n    timeout /t 5 /nobreak >nul\r\n    goto loop\r\n)", tuckifyCmd, logPath)
 	if err := os.WriteFile(batPath, []byte(content), 0o644); err != nil {
-		return "", fmt.Errorf("write bat file: %w", err)
+		return "", "", fmt.Errorf("write bat file: %w", err)
 	}
-	return batPath, nil
+	return batPath, logPath, nil
 }

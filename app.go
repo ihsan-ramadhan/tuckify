@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/BurntSushi/toml"
@@ -489,11 +490,26 @@ func (a *App) GetLogs(name string, lines int, follow bool) (string, error) {
 		return out.String(), nil
 	}
 
+	appDataDir, err := os.UserConfigDir()
+	if err == nil {
+		logPath := filepath.Join(appDataDir, "tuckify", fmt.Sprintf("tuckify-%s.log", name))
+		if data, errRead := os.ReadFile(logPath); errRead == nil && len(data) > 0 {
+			allLines := strings.Split(strings.ReplaceAll(string(data), "\r\n", "\n"), "\n")
+			if len(allLines) > 0 && allLines[len(allLines)-1] == "" {
+				allLines = allLines[:len(allLines)-1]
+			}
+			if len(allLines) > lines {
+				allLines = allLines[len(allLines)-lines:]
+			}
+			return strings.Join(allLines, "\n"), nil
+		}
+	}
+
 	status, err := srv.CheckStatus()
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("Logs not directly fetchable on this platform.\n%s\n", status), nil
+	return fmt.Sprintf("No log output recorded yet for %q.\nStatus:\n%s", name, status), nil
 }
 
 func (a *App) GetConflictStrategy() (string, error) {
