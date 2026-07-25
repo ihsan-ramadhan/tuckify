@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
+	"github.com/ihsan-ramadhan/tuckify/cmd"
 	"github.com/ihsan-ramadhan/tuckify/internal/config"
 	"github.com/ihsan-ramadhan/tuckify/internal/history"
 	"github.com/ihsan-ramadhan/tuckify/internal/organizer"
@@ -536,4 +537,8 @@ func (a *App) ValidateCron(expr string) (string, error) {
 		return err.Error(), nil
 	}
 	return "", nil
+}
+
+func (a *App) UninstallApp(keepConfig bool) error {
+	return cmd.RunUninstall(keepConfig)
 }

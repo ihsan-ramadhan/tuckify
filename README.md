@@ -199,18 +199,6 @@ See [`rules.example.toml`](rules.example.toml) for complete examples.
 
 ---
 
-## Uninstall
-
-```bash
-tuckify uninstall
-# or if you only installed the GUI:
-tuckify-gui uninstall
-```
-
-Removes the binary, system services, and desktop integration files (Linux `.desktop` and icons). Prompts whether to also delete `~/.tuckify/`.
-
----
-
 ## License
 
 MIT

@@ -14,8 +14,10 @@ import {
 	SelectDirectory, GetLogs,
 	GetConflictStrategy, SaveConflictStrategy,
 	GetRulesPath,
-	ValidateCron
+	ValidateCron,
+	UninstallApp
 } from '../wailsjs/go/main/App';
+import { Quit } from '../wailsjs/runtime/runtime';
 
 // state management
 let currentTab = 'dashboard';
@@ -1146,6 +1148,39 @@ GetRulesPath().then(p => {
 	const el = document.getElementById('config-path');
 	if (el && p) el.textContent = p;
 }).catch(() => {});
+
+const uninstall_keep = document.getElementById('uninstall-keep-btn');
+const uninstall_clean = document.getElementById('uninstall-clean-btn');
+
+async function doUninstall(keepConfig) {
+	try {
+		await UninstallApp(keepConfig);
+		showAlert('tuckify uninstalled. The app will quit now.', 'Uninstalled');
+		setTimeout(() => { try { Quit(); } catch (e) {} }, 1200);
+	} catch (e) {
+		showAlert(String(e), 'Uninstall failed');
+	}
+}
+
+uninstall_keep.addEventListener('click', () => {
+	showConfirmModal(
+		'Uninstall binary only',
+		'Removes system services, the binary, and desktop integration files. Your ~/.tuckify config is kept.',
+		'Uninstall',
+		() => doUninstall(true),
+		'btn btn-secondary'
+	);
+});
+
+uninstall_clean.addEventListener('click', () => {
+	showConfirmModal(
+		'Clean uninstall',
+		'Removes everything including the ~/.tuckify config directory. This cannot be undone.',
+		'Clean Uninstall',
+		() => doUninstall(false),
+		'btn btn-danger'
+	);
+});
 
 // initial load
 loadDashboard();

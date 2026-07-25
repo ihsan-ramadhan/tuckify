@@ -16,6 +16,7 @@
                 <button class="tab active" data-tab="dashboard">Dashboard</button>
                 <button class="tab" data-tab="rules-builder">Rules</button>
                 <button class="tab" data-tab="history">History</button>
+                <button class="tab" data-tab="settings">Settings</button>
             </nav>
         </header>
 
@@ -222,6 +223,24 @@
                         </table>
                     </div>
                     <div id="history-footer" style="display:flex; justify-content:center; padding-top:16px;"></div>
+                </div>
+            </section>
+
+            <!-- Settings Tab -->
+            <section id="settings" class="tab-panel">
+                <div class="section-header">
+                    <h2>Settings</h2>
+                </div>
+                <div class="card" style="max-width: 100%;">
+                    <h3 style="margin-bottom:8px;">Uninstall tuckify</h3>
+                    <p style="color:var(--text-secondary); margin-bottom:20px; line-height:1.6;">
+                        Removes system services, the binary, and desktop integration files (Linux <code>.desktop</code> and icons).
+                        The app quits after the binary removes itself.
+                    </p>
+                    <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                        <button type="button" id="uninstall-keep-btn" class="btn btn-secondary">Uninstall Binary (keep config)</button>
+                        <button type="button" id="uninstall-clean-btn" class="btn btn-danger">Clean Uninstall (remove config)</button>
+                    </div>
                 </div>
             </section>
         </main>
