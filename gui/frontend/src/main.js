@@ -16,7 +16,7 @@ import {
 	GetRulesPath,
 	ValidateCron,
 	UninstallApp,
-	OpenConfigFolder, OpenLogsFolder
+	OpenConfigFolder, OpenLogsFolder, OpenFolder
 } from '../wailsjs/go/main/App';
 import { Quit } from '../wailsjs/runtime/runtime';
 
@@ -435,9 +435,16 @@ function renderSchedules(schedules) {
 					<span class="status-badge ${statusClass}"><span class="status-dot"></span>${statusLabel}</span>
 				</div>
 				<div class="sched-meta">
-					<div class="meta-item">
+					<div class="meta-item vertical">
 						<span class="meta-label">Folder Target</span>
-						<span class="meta-val"><code>${(s.folders || []).join(', ')}</code></span>
+						<div class="folder-list">
+							${(s.folders || []).map(f => `
+								<div class="folder-pill">
+									<code>${f}</code>
+									<button type="button" class="btn btn-secondary open-folder-btn" style="padding:2px 8px; font-size:11px; display:inline-flex; align-items:center; gap:4px; flex-shrink:0;" data-path="${f}" title="Open Folder"><span data-icon="folder"></span> Open</button>
+								</div>
+							`).join('')}
+						</div>
 					</div>
 					<div class="meta-item">
 						<span class="meta-label">Frequency</span>
@@ -445,29 +452,73 @@ function renderSchedules(schedules) {
 					</div>
 				</div>
 			</div>
-			<div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border-subtle); padding-top:16px; margin-top:12px;">
-				<span style="font-size:12px; color:var(--text-tertiary)">Last: ${lastRunText} ${lastFilesText}</span>
-				<div style="display:flex; gap:8px;">
+			<div class="sched-card-footer">
+				<div class="sched-last-run">
+					<span>Last run: ${lastRunText}</span>
+					${lastFilesText}
+				</div>
+				<div class="sched-actions">
+					<button class="btn btn-secondary run-now-btn" style="padding:5px 10px; font-size:12px; display:inline-flex; align-items:center; gap:4px;" data-name="${s.name}"><span data-icon="play"></span> Run Now</button>
 					${s.status === 'active' ?
-						`<button class="btn btn-secondary stop-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.name}">Stop</button>` :
-						`<button class="btn btn-primary start-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.name}">Start</button>`
+						`<button class="btn btn-secondary stop-btn" style="padding:5px 10px; font-size:12px;" data-name="${s.name}">Stop</button>` :
+						`<button class="btn btn-primary start-btn" style="padding:5px 10px; font-size:12px;" data-name="${s.name}">Start</button>`
 					}
-					<button class="btn btn-secondary restart-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.name}">Restart</button>
-					<button class="btn btn-secondary logs-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.name}">Logs</button>
-					<button class="btn btn-secondary edit-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.name}">Edit</button>
-					<button class="btn btn-danger delete-btn" style="padding:4px 8px; font-size:11px;" data-name="${s.name}">Delete</button>
+					<button class="btn btn-secondary restart-btn" style="padding:5px 10px; font-size:12px;" data-name="${s.name}">Restart</button>
+					<button class="btn btn-secondary logs-btn" style="padding:5px 10px; font-size:12px;" data-name="${s.name}">Logs</button>
+					<button class="btn btn-secondary edit-btn" style="padding:5px 10px; font-size:12px;" data-name="${s.name}">Edit</button>
+					<button class="btn btn-danger delete-btn" style="padding:5px 10px; font-size:12px;" data-name="${s.name}">Delete</button>
 				</div>
 			</div>
 		`;
 		schedulesList.appendChild(card);
 	});
 
+	document.querySelectorAll('.open-folder-btn').forEach(b => b.addEventListener('click', handleOpenFolder));
+	document.querySelectorAll('.run-now-btn').forEach(b => b.addEventListener('click', handleRunNow));
 	document.querySelectorAll('.stop-btn').forEach(b => b.addEventListener('click', handleStop));
 	document.querySelectorAll('.start-btn').forEach(b => b.addEventListener('click', handleStart));
 	document.querySelectorAll('.restart-btn').forEach(b => b.addEventListener('click', handleRestart));
 	document.querySelectorAll('.logs-btn').forEach(b => b.addEventListener('click', handleLogs));
 	document.querySelectorAll('.edit-btn').forEach(b => b.addEventListener('click', handleEdit));
 	document.querySelectorAll('.delete-btn').forEach(b => b.addEventListener('click', handleDelete));
+	renderIcons();
+}
+
+async function handleOpenFolder(e) {
+	const path = e.currentTarget.dataset.path;
+	if (!path) return;
+	try {
+		await OpenFolder(path);
+	} catch (err) {
+		showAlert(`Failed to open folder: ${err}`);
+	}
+}
+
+async function handleRunNow(e) {
+	const name = e.currentTarget.dataset.name;
+	const btn = e.currentTarget;
+	const origHtml = btn.innerHTML;
+	try {
+		const schedules = await GetSchedules();
+		const target = (schedules || []).find(s => s.name === name);
+		if (!target?.folders?.length) {
+			showAlert(`Schedule "${name}" has no target folders specified.`);
+			return;
+		}
+
+		btn.disabled = true;
+		btn.innerHTML = '<span class="btn-spinner"></span> Running...';
+
+		const results = await RunOrganize(target.folders, false, target.recursive ?? true);
+		showResultsModal(results, false);
+		loadDashboard();
+	} catch (err) {
+		showAlert(`Error executing schedule "${name}": ${err}`);
+	} finally {
+		btn.disabled = false;
+		btn.innerHTML = origHtml;
+		renderIcons();
+	}
 }
 
 async function loadDashboard() {
@@ -994,7 +1045,12 @@ function renderHistoryRows(runs) {
 
 		tr.innerHTML = `
 			<td>${dateStr}</td>
-			<td><code>${foldersText || '\u2014'}</code></td>
+			<td>
+				<div style="display:inline-flex; align-items:center; gap:6px; flex-wrap:wrap;">
+					<code>${foldersText || '\u2014'}</code>
+					${(r.folders || []).map(f => `<button type="button" class="btn btn-secondary open-folder-btn" style="padding:2px 6px; font-size:11px; display:inline-flex; align-items:center; gap:4px;" data-path="${f}" title="Open Folder"><span data-icon="folder"></span></button>`).join(' ')}
+				</div>
+			</td>
 			<td><span class="badge">${movedCount} items</span></td>
 			<td>
 				<div style="display:flex; gap:6px;">
@@ -1009,8 +1065,10 @@ function renderHistoryRows(runs) {
 		historyRows.appendChild(tr);
 	});
 
+	document.querySelectorAll('.open-folder-btn').forEach(b => b.addEventListener('click', handleOpenFolder));
 	document.querySelectorAll('.undo-btn').forEach(b => b.addEventListener('click', handleUndo));
 	document.querySelectorAll('.delete-history-btn').forEach(b => b.addEventListener('click', handleDeleteHistory));
+	renderIcons();
 }
 
 function renderHistoryFooter() {
