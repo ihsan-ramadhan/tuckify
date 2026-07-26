@@ -45,6 +45,10 @@ func (w *WintaskService) Install(name string, folders []string, cronExpr, config
 	_ = w.Uninstall(name)
 
 	binaryPath := resolveBinaryPath()
+	if _, err := os.Stat(binaryPath); err != nil {
+		return fmt.Errorf("binary not found at %s: %w", binaryPath, err)
+	}
+
 	tuckifyCmd := buildWintaskCmd(name, binaryPath, folders, cronExpr, configPath)
 	taskName := wintaskPrefix + name
 
@@ -57,11 +61,21 @@ func (w *WintaskService) Install(name string, folders []string, cronExpr, config
 		return fmt.Errorf("add to startup registry: %w", err)
 	}
 
-	c := exec.Command(safeSystemCmd(cmdExe), "/c", batPath)
+	args := []string{"schedule", name}
+	for _, f := range folders {
+		args = append(args, f)
+	}
+	args = append(args, "--cron", cronExpr, "--run", "--force")
+	if configPath != "" {
+		args = append(args, "--config", configPath)
+	}
+
+	c := exec.Command(binaryPath, args...)
 	c.SysProcAttr = &syscall.SysProcAttr{
 		HideWindow:    true,
 		CreationFlags: 0x08000000, // CREATE_NO_WINDOW
 	}
+
 	if err := c.Start(); err != nil {
 		return fmt.Errorf("start background service process: %w", err)
 	}

@@ -7,7 +7,7 @@ build:
 
 wails:
 	wails build -tags webkit2_41
-	go build -o ./build/bin/tuckify ./cmd/tuckify
+	go build -o ./build/bin/ ./cmd/tuckify
 
 wails-dev:
 	wails dev -tags webkit2_41

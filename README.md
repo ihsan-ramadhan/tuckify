@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="gui/frontend/src/assets/images/logo.png" alt="tuckify logo" width="128" />
+
 # tuckify
 
 **Your Downloads folder is a graveyard. tuckify cleans it automatically.**
@@ -51,11 +53,12 @@ go build -o tuckify .
 **GUI:**
 Requires Wails CLI and Node.js:
 ```bash
-# Install Wails CLI
-go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0
+# Build both GUI and CLI binaries (output inside build/bin/)
+make wails
 
-# Build GUI binary (output inside build/bin/)
-wails build -tags desktop
+# Or build manually:
+wails build
+go build -o ./build/bin/ ./cmd/tuckify
 ```
 
 ---
