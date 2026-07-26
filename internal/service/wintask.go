@@ -14,6 +14,7 @@ const (
 	schtasksCmd   = "schtasks"
 	wintaskPrefix = "tuckify-"
 	regRunKey     = `Software\Microsoft\Windows\CurrentVersion\Run`
+	cmdExe        = "cmd.exe"
 )
 
 func safeSystemCmd(binary string) string {
@@ -22,8 +23,8 @@ func safeSystemCmd(binary string) string {
 		sysRoot = `C:\Windows`
 	}
 	switch binary {
-	case "cmd", "cmd.exe":
-		return filepath.Join(sysRoot, "System32", "cmd.exe")
+	case "cmd", cmdExe:
+		return filepath.Join(sysRoot, "System32", cmdExe)
 	case "powershell", "powershell.exe":
 		return filepath.Join(sysRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe")
 	case "reg", "reg.exe":
@@ -56,7 +57,7 @@ func (w *WintaskService) Install(name string, folders []string, cronExpr, config
 		return fmt.Errorf("add to startup registry: %w", err)
 	}
 
-	c := exec.Command(safeSystemCmd("cmd.exe"), "/c", batPath)
+	c := exec.Command(safeSystemCmd(cmdExe), "/c", batPath)
 	c.SysProcAttr = &syscall.SysProcAttr{
 		HideWindow:    true,
 		CreationFlags: 0x08000000, // CREATE_NO_WINDOW

@@ -37,7 +37,7 @@ verify_checksum() {
 
     checksums_url="${BASE_URL}/checksums.txt"
     tmp_checksums=$(mktemp)
-    if curl -fsSL --proto-redir =https "${checksums_url}" -o "${tmp_checksums}"; then
+    if curl -fsSL --proto =https --proto-redir =https "${checksums_url}" -o "${tmp_checksums}"; then
         expected=$(grep "  ${file_name}$" "${tmp_checksums}" | awk '{print $1}')
         rm -f "${tmp_checksums}"
         if [ -n "$expected" ]; then
@@ -63,7 +63,7 @@ if [ "$GUI" = true ]; then
         URL="${BASE_URL}/tuckify-gui-mac-universal.zip"
         TMP_ZIP=$(mktemp)
         echo "Downloading tuckify-gui ${VERSION} for macOS..."
-        curl -fsSL "${URL}" -o "${TMP_ZIP}"
+        curl -fsSL --proto =https --proto-redir =https "${URL}" -o "${TMP_ZIP}"
         verify_checksum "${TMP_ZIP}"
         echo "Installing to /Applications..."
         unzip -q -o "${TMP_ZIP}" -d "/Applications"
@@ -76,7 +76,7 @@ if [ "$GUI" = true ]; then
         fi
         URL="${BASE_URL}/tuckify-gui-linux-amd64"
         echo "Downloading tuckify-gui ${VERSION} for Linux (amd64)..."
-        curl -fsSL "${URL}" -o "${INSTALL_DIR}/tuckify-gui"
+        curl -fsSL --proto =https --proto-redir =https "${URL}" -o "${INSTALL_DIR}/tuckify-gui"
         verify_checksum "${INSTALL_DIR}/tuckify-gui"
         chmod +x "${INSTALL_DIR}/tuckify-gui"
         echo "tuckify-gui successfully installed to ${INSTALL_DIR}/tuckify-gui"
@@ -85,7 +85,7 @@ if [ "$GUI" = true ]; then
         echo "Creating desktop shortcut and installing application icon..."
         ICON_DIR="${HOME}/.local/share/icons/hicolor/512x512/apps"
         mkdir -p "${ICON_DIR}"
-        curl -fsSL --proto-redir =https "https://raw.githubusercontent.com/${REPO}/main/gui/frontend/src/assets/images/logo.png" -o "${ICON_DIR}/tuckify.png"
+        curl -fsSL --proto =https --proto-redir =https "https://raw.githubusercontent.com/${REPO}/main/gui/frontend/src/assets/images/logo.png" -o "${ICON_DIR}/tuckify.png"
 
         APPS_DIR="${HOME}/.local/share/applications"
         mkdir -p "${APPS_DIR}"
@@ -107,7 +107,7 @@ else
     BINARY="tuckify-${OS}-${ARCH}"
     URL="${BASE_URL}/${BINARY}"
     echo "Downloading tuckify ${VERSION} for ${OS}/${ARCH}..."
-    curl -fsSL "${URL}" -o "${INSTALL_DIR}/tuckify"
+    curl -fsSL --proto =https --proto-redir =https "${URL}" -o "${INSTALL_DIR}/tuckify"
     verify_checksum "${INSTALL_DIR}/tuckify"
     chmod +x "${INSTALL_DIR}/tuckify"
     echo "tuckify successfully installed to ${INSTALL_DIR}/tuckify"
