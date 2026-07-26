@@ -16,7 +16,7 @@ import {
 	GetRulesPath,
 	ValidateCron,
 	UninstallApp,
-	OpenConfigFolder, OpenLogsFolder, OpenFolder
+	OpenConfigFolder, OpenLogsFolder
 } from '../wailsjs/go/main/App';
 import { Quit } from '../wailsjs/runtime/runtime';
 

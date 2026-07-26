@@ -30,7 +30,7 @@ export function summaryIcon(svg) {
 
 export function renderIcons() {
 	document.querySelectorAll('[data-icon]').forEach(el => {
-		const name = el.getAttribute('data-icon');
+		const name = el.dataset.icon;
 		if (ICONS[name]) {
 			el.innerHTML = ICONS[name];
 		}

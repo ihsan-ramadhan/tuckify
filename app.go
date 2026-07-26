@@ -589,11 +589,19 @@ func (a *App) OpenFolder(targetPath string) error {
 	var c *exec.Cmd
 	switch goruntime.GOOS {
 	case "windows":
-		c = exec.Command("explorer", targetPath)
+		sysRoot := os.Getenv("SystemRoot")
+		if sysRoot == "" {
+			sysRoot = `C:\Windows`
+		}
+		c = exec.Command(filepath.Join(sysRoot, "explorer.exe"), targetPath)
 	case "darwin":
-		c = exec.Command("open", targetPath)
+		c = exec.Command("/usr/bin/open", targetPath)
 	default:
-		c = exec.Command("xdg-open", targetPath)
+		cmdPath, err := exec.LookPath("xdg-open")
+		if err != nil {
+			cmdPath = "/usr/bin/xdg-open"
+		}
+		c = exec.Command(cmdPath, targetPath)
 	}
 	return c.Start()
 }
