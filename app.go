@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	goruntime "runtime"
 	"strings"
 	"time"
 
@@ -559,4 +560,69 @@ func (a *App) ValidateCron(expr string) (string, error) {
 
 func (a *App) UninstallApp(keepConfig bool) error {
 	return cmd.RunUninstall(keepConfig)
+}
+
+func (a *App) OpenFolder(targetPath string) error {
+	if targetPath == "" {
+		return fmt.Errorf("path is empty")
+	}
+
+	if strings.HasPrefix(targetPath, "~") {
+		home, err := os.UserHomeDir()
+		if err == nil {
+			targetPath = filepath.Join(home, targetPath[1:])
+		}
+	}
+
+	fi, err := os.Stat(targetPath)
+	if err != nil {
+		parent := filepath.Dir(targetPath)
+		if pFi, pErr := os.Stat(parent); pErr == nil && pFi.IsDir() {
+			targetPath = parent
+		} else {
+			return err
+		}
+	} else if !fi.IsDir() {
+		targetPath = filepath.Dir(targetPath)
+	}
+
+	var c *exec.Cmd
+	switch goruntime.GOOS {
+	case "windows":
+		sysRoot := os.Getenv("SystemRoot")
+		if sysRoot == "" {
+			sysRoot = `C:\Windows`
+		}
+		c = exec.Command(filepath.Join(sysRoot, "explorer.exe"), targetPath)
+	case "darwin":
+		c = exec.Command("/usr/bin/open", targetPath)
+	default:
+		cmdPath, err := exec.LookPath("xdg-open")
+		if err != nil {
+			cmdPath = "/usr/bin/xdg-open"
+		}
+		c = exec.Command(cmdPath, targetPath)
+	}
+	return c.Start()
+}
+
+func (a *App) OpenConfigFolder() error {
+	p := a.GetRulesPath()
+	dir := filepath.Dir(p)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+	return a.OpenFolder(dir)
+}
+
+func (a *App) OpenLogsFolder() error {
+	appDataDir, err := os.UserConfigDir()
+	if err != nil {
+		return err
+	}
+	logDir := filepath.Join(appDataDir, "tuckify")
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		return err
+	}
+	return a.OpenFolder(logDir)
 }

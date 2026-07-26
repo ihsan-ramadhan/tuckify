@@ -18,12 +18,12 @@ jobs:
       - name: Build CLI binaries
         run: |
           mkdir -p dist
-          GOOS=linux GOARCH=amd64 go build -o dist/tuckify-linux-amd64 ./cmd/tuckify
-          GOOS=linux GOARCH=arm64 go build -o dist/tuckify-linux-arm64 ./cmd/tuckify
-          GOOS=darwin GOARCH=amd64 go build -o dist/tuckify-darwin-amd64 ./cmd/tuckify
-          GOOS=darwin GOARCH=arm64 go build -o dist/tuckify-darwin-arm64 ./cmd/tuckify
-          GOOS=windows GOARCH=amd64 go build -o dist/tuckify-windows-amd64.exe ./cmd/tuckify
-          GOOS=windows GOARCH=arm64 go build -o dist/tuckify-windows-arm64.exe ./cmd/tuckify
+          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o dist/tuckify-linux-amd64 ./cmd/tuckify
+          GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o dist/tuckify-linux-arm64 ./cmd/tuckify
+          GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o dist/tuckify-darwin-amd64 ./cmd/tuckify
+          GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o dist/tuckify-darwin-arm64 ./cmd/tuckify
+          GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o dist/tuckify-windows-amd64.exe ./cmd/tuckify
+          GOOS=windows GOARCH=arm64 go build -ldflags="-s -w" -o dist/tuckify-windows-arm64.exe ./cmd/tuckify
 
       - uses: actions/upload-artifact@v7
         with:
@@ -77,14 +77,14 @@ jobs:
       - name: Build Wails App (Linux)
         if: matrix.os == 'ubuntu-latest'
         run: |
-          wails build -tags "desktop webkit2_41"
+          wails build -tags "desktop webkit2_41" -ldflags "-s -w"
           mkdir -p dist-gui
           cp build/bin/tuckify-gui* dist-gui/${{ matrix.release_name }}
 
       - name: Build Wails App (macOS)
         if: matrix.os == 'macos-latest'
         run: |
-          wails build -tags desktop
+          wails build -tags desktop -ldflags "-s -w"
           mkdir -p dist-gui
           cd build/bin
           zip -r ../../dist-gui/tuckify-gui-mac-universal.zip tuckify-gui.app
@@ -92,7 +92,7 @@ jobs:
       - name: Build Wails App (Windows)
         if: matrix.os == 'windows-latest'
         run: |
-          wails build -tags desktop
+          wails build -tags desktop -ldflags "-s -w"
           mkdir -p dist-gui
           cp build/bin/tuckify-gui* dist-gui/${{ matrix.release_name }}
 

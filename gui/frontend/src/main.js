@@ -3,7 +3,7 @@ import './app.css';
 import '@fontsource-variable/plus-jakarta-sans';
 import '@fontsource-variable/dm-sans';
 import '@fontsource-variable/jetbrains-mono';
-import { ICONS } from './icons.js';
+import { ICONS, renderIcons } from './icons.js';
 
 import {
 	GetSchedules, SaveSchedule, StartSchedule, StopSchedule, DeleteSchedule,
@@ -15,7 +15,8 @@ import {
 	GetConflictStrategy, SaveConflictStrategy,
 	GetRulesPath,
 	ValidateCron,
-	UninstallApp
+	UninstallApp,
+	OpenConfigFolder, OpenLogsFolder
 } from '../wailsjs/go/main/App';
 import { Quit } from '../wailsjs/runtime/runtime';
 
@@ -1162,6 +1163,29 @@ async function doUninstall(keepConfig) {
 	}
 }
 
+const openConfigFolderBtn = document.getElementById('open-config-folder-btn');
+const openLogsFolderBtn = document.getElementById('open-logs-folder-btn');
+
+if (openConfigFolderBtn) {
+	openConfigFolderBtn.addEventListener('click', async () => {
+		try {
+			await OpenConfigFolder();
+		} catch (e) {
+			showAlert(String(e), 'Failed to open folder');
+		}
+	});
+}
+
+if (openLogsFolderBtn) {
+	openLogsFolderBtn.addEventListener('click', async () => {
+		try {
+			await OpenLogsFolder();
+		} catch (e) {
+			showAlert(String(e), 'Failed to open folder');
+		}
+	});
+}
+
 uninstall_keep.addEventListener('click', () => {
 	showConfirmModal(
 		'Uninstall binary only',
@@ -1183,4 +1207,5 @@ uninstall_clean.addEventListener('click', () => {
 });
 
 // initial load
+renderIcons();
 loadDashboard();
