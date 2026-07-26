@@ -1,5 +1,3 @@
-//go:build desktop
-
 package main
 
 import (
@@ -465,6 +463,25 @@ func (a *App) ClearHistory() error {
 	return history.ClearAll()
 }
 
+func (a *App) getSystemdLogs(name string, lines int, follow bool) (string, error) {
+	jctl, errJ := exec.LookPath("journalctl")
+	if errJ != nil {
+		return "", fmt.Errorf("journalctl not found: %w", errJ)
+	}
+	args := []string{"--user", "-u", "tuckify-" + name, "-n", fmt.Sprintf("%d", lines), "--no-pager", "-o", "short-monotonic"}
+	if follow {
+		args = append(args, "-f")
+	}
+	ctx, cancel := context.WithTimeout(a.ctx, 5*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, jctl, args...)
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &out
+	_ = cmd.Run()
+	return out.String(), nil
+}
+
 func (a *App) GetLogs(name string, lines int, follow bool) (string, error) {
 	srv, err := service.NewService()
 	if err != nil {
@@ -472,22 +489,7 @@ func (a *App) GetLogs(name string, lines int, follow bool) (string, error) {
 	}
 
 	if _, errSys := exec.LookPath("systemctl"); errSys == nil {
-		jctl, errJ := exec.LookPath("journalctl")
-		if errJ != nil {
-			return "", fmt.Errorf("journalctl not found: %w", errJ)
-		}
-		args := []string{"--user", "-u", "tuckify-" + name, "-n", fmt.Sprintf("%d", lines), "--no-pager", "-o", "short-monotonic"}
-		if follow {
-			args = append(args, "-f")
-		}
-		ctx, cancel := context.WithTimeout(a.ctx, 5*time.Second)
-		defer cancel()
-		cmd := exec.CommandContext(ctx, jctl, args...)
-		var out bytes.Buffer
-		cmd.Stdout = &out
-		cmd.Stderr = &out
-		_ = cmd.Run()
-		return out.String(), nil
+		return a.getSystemdLogs(name, lines, follow)
 	}
 
 	appDataDir, err := os.UserConfigDir()

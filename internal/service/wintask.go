@@ -16,6 +16,24 @@ const (
 	regRunKey     = `Software\Microsoft\Windows\CurrentVersion\Run`
 )
 
+func safeSystemCmd(binary string) string {
+	sysRoot := os.Getenv("SystemRoot")
+	if sysRoot == "" {
+		sysRoot = `C:\Windows`
+	}
+	switch binary {
+	case "cmd", "cmd.exe":
+		return filepath.Join(sysRoot, "System32", "cmd.exe")
+	case "powershell", "powershell.exe":
+		return filepath.Join(sysRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe")
+	case "reg", "reg.exe":
+		return filepath.Join(sysRoot, "System32", "reg.exe")
+	case "schtasks", "schtasks.exe":
+		return filepath.Join(sysRoot, "System32", "schtasks.exe")
+	}
+	return binary
+}
+
 type WintaskService struct{}
 
 func NewWintaskService() *WintaskService {
@@ -38,7 +56,7 @@ func (w *WintaskService) Install(name string, folders []string, cronExpr, config
 		return fmt.Errorf("add to startup registry: %w", err)
 	}
 
-	c := exec.Command("cmd.exe", "/c", batPath)
+	c := exec.Command(safeSystemCmd("cmd.exe"), "/c", batPath)
 	c.SysProcAttr = &syscall.SysProcAttr{
 		HideWindow:    true,
 		CreationFlags: 0x08000000, // CREATE_NO_WINDOW
@@ -50,46 +68,51 @@ func (w *WintaskService) Install(name string, folders []string, cronExpr, config
 	return nil
 }
 
-func (w *WintaskService) Uninstall(name string) error {
-	if name != "" {
-		taskName := wintaskPrefix + name
+func (w *WintaskService) uninstallSingle(name string) error {
+	taskName := wintaskPrefix + name
 
-		psCmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command",
-			fmt.Sprintf("Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*tuckify-%s.bat*' -or $_.CommandLine -like '*schedule*%s*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }", name, name))
-		psCmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
-		_ = psCmd.Run()
+	psCmd := exec.Command(safeSystemCmd("powershell"), "-NoProfile", "-NonInteractive", "-Command",
+		fmt.Sprintf("Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*"+wintaskPrefix+"%s.bat*' -or $_.CommandLine -like '*schedule*%s*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }", name, name))
+	psCmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
+	_ = psCmd.Run()
 
-		_ = cmd("reg", "delete", `HKCU\`+regRunKey, "/v", taskName, "/f").Run()
+	_ = cmd("reg", "delete", `HKCU\`+regRunKey, "/v", taskName, "/f").Run()
 
-		if winSch, err := exec.LookPath(schtasksCmd); err == nil {
-			_ = cmd(winSch, "/delete", "/tn", taskName, "/f").Run()
-		}
+	_ = cmd(safeSystemCmd(schtasksCmd), "/delete", "/tn", taskName, "/f").Run()
 
-		appDataDir, err := os.UserConfigDir()
-		if err == nil {
-			batPath := filepath.Join(appDataDir, "tuckify", fmt.Sprintf("tuckify-%s.bat", name))
-			_ = os.Remove(batPath)
-		}
-	} else {
-		psCmd := exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command",
-			"Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*tuckify-*.bat*' -or $_.CommandLine -like '*schedule*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }")
-		psCmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
-		_ = psCmd.Run()
+	appDataDir, err := os.UserConfigDir()
+	if err == nil {
+		batPath := filepath.Join(appDataDir, "tuckify", fmt.Sprintf(wintaskPrefix+"%s.bat", name))
+		_ = os.Remove(batPath)
+	}
+	return nil
+}
 
-		appDataDir, err := os.UserConfigDir()
-		if err == nil {
-			entries, _ := os.ReadDir(filepath.Join(appDataDir, "tuckify"))
-			for _, e := range entries {
-				if strings.HasPrefix(e.Name(), "tuckify-") && strings.HasSuffix(e.Name(), ".bat") {
-					schedName := strings.TrimSuffix(strings.TrimPrefix(e.Name(), "tuckify-"), ".bat")
-					_ = cmd("reg", "delete", `HKCU\`+regRunKey, "/v", wintaskPrefix+schedName, "/f").Run()
-					_ = os.Remove(filepath.Join(appDataDir, "tuckify", e.Name()))
-				}
+func (w *WintaskService) uninstallAll() error {
+	psCmd := exec.Command(safeSystemCmd("powershell"), "-NoProfile", "-NonInteractive", "-Command",
+		"Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*"+wintaskPrefix+"*.bat*' -or $_.CommandLine -like '*schedule*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }")
+	psCmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
+	_ = psCmd.Run()
+
+	appDataDir, err := os.UserConfigDir()
+	if err == nil {
+		entries, _ := os.ReadDir(filepath.Join(appDataDir, "tuckify"))
+		for _, e := range entries {
+			if strings.HasPrefix(e.Name(), wintaskPrefix) && strings.HasSuffix(e.Name(), ".bat") {
+				schedName := strings.TrimSuffix(strings.TrimPrefix(e.Name(), wintaskPrefix), ".bat")
+				_ = cmd("reg", "delete", `HKCU\`+regRunKey, "/v", wintaskPrefix+schedName, "/f").Run()
+				_ = os.Remove(filepath.Join(appDataDir, "tuckify", e.Name()))
 			}
 		}
 	}
-
 	return nil
+}
+
+func (w *WintaskService) Uninstall(name string) error {
+	if name != "" {
+		return w.uninstallSingle(name)
+	}
+	return w.uninstallAll()
 }
 
 func (w *WintaskService) Exists(name string) (bool, error) {
@@ -144,7 +167,7 @@ func buildWintaskCmd(name, binaryPath string, folders []string, cronExpr, config
 
 // cmd wraps exec.Command with HideWindow to prevent console window flashes.
 func cmd(name string, args ...string) *exec.Cmd {
-	c := exec.Command(name, args...)
+	c := exec.Command(safeSystemCmd(name), args...)
 	c.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
 	return c
 }
@@ -158,8 +181,8 @@ func writeRestartBat(name, tuckifyCmd string) (string, string, error) {
 	if err := os.MkdirAll(batDir, 0o755); err != nil {
 		return "", "", fmt.Errorf("create bat dir: %w", err)
 	}
-	batPath := filepath.Join(batDir, fmt.Sprintf("tuckify-%s.bat", name))
-	logPath := filepath.Join(batDir, fmt.Sprintf("tuckify-%s.log", name))
+	batPath := filepath.Join(batDir, fmt.Sprintf(wintaskPrefix+"%s.bat", name))
+	logPath := filepath.Join(batDir, fmt.Sprintf(wintaskPrefix+"%s.log", name))
 
 	content := fmt.Sprintf("@echo off\r\n:loop\r\n%s >> \"%s\" 2>&1\r\nif %%ERRORLEVEL%% NEQ 0 (\r\n    timeout /t 5 /nobreak >nul\r\n    goto loop\r\n)", tuckifyCmd, logPath)
 	if err := os.WriteFile(batPath, []byte(content), 0o644); err != nil {

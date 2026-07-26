@@ -3,11 +3,11 @@
 BINARY_NAME=tuckify
 
 build:
-	go build -o $(BINARY_NAME) .
+	go build -o $(BINARY_NAME) ./cmd/tuckify
 
 wails:
 	wails build -tags webkit2_41
-	go build -o ./build/bin/tuckify .
+	go build -o ./build/bin/tuckify ./cmd/tuckify
 
 wails-dev:
 	wails dev -tags webkit2_41
@@ -28,7 +28,7 @@ install-hooks:
 
 release: clean
 	mkdir -p dist
-	GOOS=linux GOARCH=amd64 go build -o dist/$(BINARY_NAME)-linux-amd64 .
-	GOOS=darwin GOARCH=amd64 go build -o dist/$(BINARY_NAME)-darwin-amd64 .
-	GOOS=darwin GOARCH=arm64 go build -o dist/$(BINARY_NAME)-darwin-arm64 .
-	GOOS=windows GOARCH=amd64 go build -o dist/$(BINARY_NAME)-windows-amd64.exe .
+	GOOS=linux GOARCH=amd64 go build -o dist/$(BINARY_NAME)-linux-amd64 ./cmd/tuckify
+	GOOS=darwin GOARCH=amd64 go build -o dist/$(BINARY_NAME)-darwin-amd64 ./cmd/tuckify
+	GOOS=darwin GOARCH=arm64 go build -o dist/$(BINARY_NAME)-darwin-arm64 ./cmd/tuckify
+	GOOS=windows GOARCH=amd64 go build -o dist/$(BINARY_NAME)-windows-amd64.exe ./cmd/tuckify

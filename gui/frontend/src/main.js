@@ -316,11 +316,11 @@ function describeCron(expr) {
 	};
 	// every N minutes
 	if (/^\*\/(\d+)$/.test(min) && hr === '*' && dom === '*' && mon === '*' && dow === '*') {
-		return `Every ${RegExp.$1} minutes`;
+		return `Every ${min.match(/^\*\/(\d+)$/)[1]} minutes`;
 	}
 	// every N hours
 	if (min === '0' && /^\*\/(\d+)$/.test(hr) && dom === '*' && mon === '*' && dow === '*') {
-		return `Every ${RegExp.$1} hours`;
+		return `Every ${hr.match(/^\*\/(\d+)$/)[1]} hours`;
 	}
 	// daily at HH:MM
 	if (/^\d+$/.test(min) && /^\d+$/.test(hr) && dom === '*' && mon === '*' && dow === '*') {

@@ -11,21 +11,21 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
 
       - name: Build CLI binaries
         run: |
           mkdir -p dist
-          GOOS=linux GOARCH=amd64 go build -o dist/tuckify-linux-amd64 .
-          GOOS=linux GOARCH=arm64 go build -o dist/tuckify-linux-arm64 .
-          GOOS=darwin GOARCH=amd64 go build -o dist/tuckify-darwin-amd64 .
-          GOOS=darwin GOARCH=arm64 go build -o dist/tuckify-darwin-arm64 .
-          GOOS=windows GOARCH=amd64 go build -o dist/tuckify-windows-amd64.exe .
-          GOOS=windows GOARCH=arm64 go build -o dist/tuckify-windows-arm64.exe .
+          GOOS=linux GOARCH=amd64 go build -o dist/tuckify-linux-amd64 ./cmd/tuckify
+          GOOS=linux GOARCH=arm64 go build -o dist/tuckify-linux-arm64 ./cmd/tuckify
+          GOOS=darwin GOARCH=amd64 go build -o dist/tuckify-darwin-amd64 ./cmd/tuckify
+          GOOS=darwin GOARCH=arm64 go build -o dist/tuckify-darwin-arm64 ./cmd/tuckify
+          GOOS=windows GOARCH=amd64 go build -o dist/tuckify-windows-amd64.exe ./cmd/tuckify
+          GOOS=windows GOARCH=arm64 go build -o dist/tuckify-windows-arm64.exe ./cmd/tuckify
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: cli-binaries
           path: dist/*
@@ -47,11 +47,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
 
@@ -67,6 +67,12 @@ jobs:
       - name: Install Frontend Dependencies
         working-directory: gui/frontend
         run: npm install
+
+      - name: Create dummy dist folder
+        shell: bash
+        run: |
+          mkdir -p gui/frontend/dist
+          touch gui/frontend/dist/index.html
 
       - name: Build Wails App (Linux)
         if: matrix.os == 'ubuntu-latest'
@@ -90,7 +96,7 @@ jobs:
           mkdir -p dist-gui
           cp build/bin/tuckify-gui* dist-gui/${{ matrix.release_name }}
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: gui-binaries-${{ matrix.release_name }}
           path: dist-gui/*
@@ -103,22 +109,22 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: cli-binaries
           path: dist
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: gui-binaries-tuckify-gui-linux-amd64
           path: dist
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: gui-binaries-tuckify-gui-windows-amd64.exe
           path: dist
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: gui-binaries-tuckify-gui-mac-universal.zip
           path: dist
@@ -128,7 +134,7 @@ jobs:
           cd dist
           sha256sum * > checksums.txt
 
-      - uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
+      - uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
           generate_release_notes: true
           draft: true

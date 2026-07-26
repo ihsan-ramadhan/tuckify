@@ -37,7 +37,7 @@ verify_checksum() {
 
     checksums_url="${BASE_URL}/checksums.txt"
     tmp_checksums=$(mktemp)
-    if curl -fsSL "${checksums_url}" -o "${tmp_checksums}"; then
+    if curl -fsSL --proto-redir =https "${checksums_url}" -o "${tmp_checksums}"; then
         expected=$(grep "  ${file_name}$" "${tmp_checksums}" | awk '{print $1}')
         rm -f "${tmp_checksums}"
         if [ -n "$expected" ]; then
@@ -85,7 +85,7 @@ if [ "$GUI" = true ]; then
         echo "Creating desktop shortcut and installing application icon..."
         ICON_DIR="${HOME}/.local/share/icons/hicolor/512x512/apps"
         mkdir -p "${ICON_DIR}"
-        curl -fsSL "https://raw.githubusercontent.com/${REPO}/main/gui/frontend/src/assets/images/logo.png" -o "${ICON_DIR}/tuckify.png"
+        curl -fsSL --proto-redir =https "https://raw.githubusercontent.com/${REPO}/main/gui/frontend/src/assets/images/logo.png" -o "${ICON_DIR}/tuckify.png"
 
         APPS_DIR="${HOME}/.local/share/applications"
         mkdir -p "${APPS_DIR}"

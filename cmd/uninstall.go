@@ -53,7 +53,7 @@ func init() {
 	rootCmd.AddCommand(uninstallCmd)
 }
 
-func RunUninstall(keepConfig bool) error {
+func uninstallService() {
 	srv, err := service.NewService()
 	if err == nil {
 		if err := srv.Uninstall(""); err == nil {
@@ -64,7 +64,9 @@ func RunUninstall(keepConfig bool) error {
 	} else {
 		fmt.Fprintf(os.Stderr, "Warning: failed to initialize service manager: %v\n", err)
 	}
+}
 
+func uninstallBinary() {
 	binaryPath, err := os.Executable()
 	if err == nil {
 		if err := os.Remove(binaryPath); err == nil {
@@ -83,7 +85,9 @@ func RunUninstall(keepConfig bool) error {
 	} else {
 		fmt.Fprintln(os.Stderr, "Warning: failed to find running binary path.")
 	}
+}
 
+func uninstallDesktop() {
 	homeDir, err := os.UserHomeDir()
 	if err == nil {
 		desktopFile := filepath.Join(homeDir, ".local", "share", "applications", "tuckify.desktop")
@@ -91,7 +95,9 @@ func RunUninstall(keepConfig bool) error {
 		iconFile := filepath.Join(homeDir, ".local", "share", "icons", "hicolor", "512x512", "apps", "tuckify.png")
 		_ = os.Remove(iconFile)
 	}
+}
 
+func uninstallConfig(keepConfig bool) {
 	if !keepConfig {
 		configDir := filepath.Dir(config.DefaultConfigPath())
 		if _, err := os.Stat(configDir); err == nil {
@@ -102,6 +108,12 @@ func RunUninstall(keepConfig bool) error {
 			}
 		}
 	}
+}
 
+func RunUninstall(keepConfig bool) error {
+	uninstallService()
+	uninstallBinary()
+	uninstallDesktop()
+	uninstallConfig(keepConfig)
 	return nil
 }
