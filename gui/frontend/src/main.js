@@ -501,7 +501,7 @@ async function handleRunNow(e) {
 	try {
 		const schedules = await GetSchedules();
 		const target = (schedules || []).find(s => s.name === name);
-		if (!target || !target.folders || target.folders.length === 0) {
+		if (!target?.folders?.length) {
 			showAlert(`Schedule "${name}" has no target folders specified.`);
 			return;
 		}
