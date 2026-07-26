@@ -16,7 +16,7 @@ import {
 	GetRulesPath,
 	ValidateCron,
 	UninstallApp,
-	OpenConfigFolder, OpenLogsFolder
+	OpenConfigFolder, OpenLogsFolder, OpenFolder
 } from '../wailsjs/go/main/App';
 import { Quit } from '../wailsjs/runtime/runtime';
 
@@ -437,7 +437,10 @@ function renderSchedules(schedules) {
 				<div class="sched-meta">
 					<div class="meta-item">
 						<span class="meta-label">Folder Target</span>
-						<span class="meta-val"><code>${(s.folders || []).join(', ')}</code></span>
+						<span class="meta-val" style="display:inline-flex; align-items:center; gap:6px; flex-wrap:wrap;">
+							<code>${(s.folders || []).join(', ')}</code>
+							${(s.folders || []).map(f => `<button type="button" class="btn btn-secondary open-folder-btn" style="padding:2px 6px; font-size:11px; display:inline-flex; align-items:center; gap:4px;" data-path="${f}" title="Open Folder"><span data-icon="folder"></span> Open</button>`).join(' ')}
+						</span>
 					</div>
 					<div class="meta-item">
 						<span class="meta-label">Frequency</span>
@@ -462,12 +465,24 @@ function renderSchedules(schedules) {
 		schedulesList.appendChild(card);
 	});
 
+	document.querySelectorAll('.open-folder-btn').forEach(b => b.addEventListener('click', handleOpenFolder));
 	document.querySelectorAll('.stop-btn').forEach(b => b.addEventListener('click', handleStop));
 	document.querySelectorAll('.start-btn').forEach(b => b.addEventListener('click', handleStart));
 	document.querySelectorAll('.restart-btn').forEach(b => b.addEventListener('click', handleRestart));
 	document.querySelectorAll('.logs-btn').forEach(b => b.addEventListener('click', handleLogs));
 	document.querySelectorAll('.edit-btn').forEach(b => b.addEventListener('click', handleEdit));
 	document.querySelectorAll('.delete-btn').forEach(b => b.addEventListener('click', handleDelete));
+	renderIcons();
+}
+
+async function handleOpenFolder(e) {
+	const path = e.currentTarget.dataset.path;
+	if (!path) return;
+	try {
+		await OpenFolder(path);
+	} catch (err) {
+		showAlert(`Failed to open folder: ${err}`);
+	}
 }
 
 async function loadDashboard() {
@@ -994,7 +1009,12 @@ function renderHistoryRows(runs) {
 
 		tr.innerHTML = `
 			<td>${dateStr}</td>
-			<td><code>${foldersText || '\u2014'}</code></td>
+			<td>
+				<div style="display:inline-flex; align-items:center; gap:6px; flex-wrap:wrap;">
+					<code>${foldersText || '\u2014'}</code>
+					${(r.folders || []).map(f => `<button type="button" class="btn btn-secondary open-folder-btn" style="padding:2px 6px; font-size:11px; display:inline-flex; align-items:center; gap:4px;" data-path="${f}" title="Open Folder"><span data-icon="folder"></span></button>`).join(' ')}
+				</div>
+			</td>
 			<td><span class="badge">${movedCount} items</span></td>
 			<td>
 				<div style="display:flex; gap:6px;">
@@ -1009,8 +1029,10 @@ function renderHistoryRows(runs) {
 		historyRows.appendChild(tr);
 	});
 
+	document.querySelectorAll('.open-folder-btn').forEach(b => b.addEventListener('click', handleOpenFolder));
 	document.querySelectorAll('.undo-btn').forEach(b => b.addEventListener('click', handleUndo));
 	document.querySelectorAll('.delete-history-btn').forEach(b => b.addEventListener('click', handleDeleteHistory));
+	renderIcons();
 }
 
 function renderHistoryFooter() {
