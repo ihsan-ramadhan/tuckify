@@ -78,7 +78,7 @@ func resolveBinaryPath() string {
 		return path
 	}
 
-	return cliName
+	return exe
 }
 
 func NewService() (Service, error) {
