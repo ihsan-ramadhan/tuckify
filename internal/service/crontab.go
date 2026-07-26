@@ -28,7 +28,7 @@ func buildCrontabLine(name, binaryPath string, folders []string, cronExpr, confi
 	for i, f := range folders {
 		escapedFolders[i] = fmt.Sprintf("%q", f)
 	}
-	cronCmd := fmt.Sprintf("%s schedule %s %s --cron %q --run", binaryPath, name, strings.Join(escapedFolders, " "), cronExpr)
+	cronCmd := fmt.Sprintf("%s schedule %s %s --cron %q --run --force", binaryPath, name, strings.Join(escapedFolders, " "), cronExpr)
 	if configPath != "" {
 		cronCmd += fmt.Sprintf(" --config %q", configPath)
 	}

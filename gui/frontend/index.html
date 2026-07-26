@@ -16,6 +16,7 @@
                 <button class="tab active" data-tab="dashboard">Dashboard</button>
                 <button class="tab" data-tab="rules-builder">Rules</button>
                 <button class="tab" data-tab="history">History</button>
+                <button class="tab" data-tab="settings">Settings</button>
             </nav>
         </header>
 
@@ -121,6 +122,7 @@
                                         <option value="0 0 * * 0">Every Week (Sunday)</option>
                                         <option value="0 0 1 * *">Every Month (1st)</option>
                                         <option value="custom">Custom...</option>
+                                        <option value="advanced">Advanced (raw)...</option>
                                     </select>
                                 </div>
                                 <div id="custom-cron-group" class="cron-builder hidden">
@@ -130,8 +132,17 @@
                                     </div>					<div class="cron-preview">
 						<span class="cron-preview-label">Cron expression:</span>
 						<code id="cron-preview-value">* * * * *</code>
+						<span id="cron-human" class="cron-human"></span>
 					</div>
 				</div>
+                                <div id="raw-cron-group" class="cron-builder hidden" style="margin-top:10px;">
+                                    <input type="text" id="cron-raw" class="form-control" placeholder="0 9 * * 1-5" aria-label="Raw cron expression" style="font-family:var(--font-mono,monospace);">
+                                    <div class="cron-preview" style="margin-top:6px;">
+                                        <span class="cron-preview-label">Cron expression:</span>
+                                        <code id="cron-raw-value"></code>
+                                        <span id="cron-raw-human" class="cron-human"></span>
+                                    </div>
+                                </div>
                                 <div class="form-group" style="display:flex; gap:24px; margin-top:8px;">
                                     <label class="checkbox-label">
                                         <input type="checkbox" id="sched-recursive" checked>
@@ -212,6 +223,24 @@
                         </table>
                     </div>
                     <div id="history-footer" style="display:flex; justify-content:center; padding-top:16px;"></div>
+                </div>
+            </section>
+
+            <!-- Settings Tab -->
+            <section id="settings" class="tab-panel">
+                <div class="section-header">
+                    <h2>Settings</h2>
+                </div>
+                <div class="card" style="max-width: 100%;">
+                    <h3 style="margin-bottom:8px;">Uninstall tuckify</h3>
+                    <p style="color:var(--text-secondary); margin-bottom:20px; line-height:1.6;">
+                        Removes system services, the binary, and desktop integration files (Linux <code>.desktop</code> and icons).
+                        The app quits after the binary removes itself.
+                    </p>
+                    <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                        <button type="button" id="uninstall-keep-btn" class="btn btn-secondary">Uninstall Binary (keep config)</button>
+                        <button type="button" id="uninstall-clean-btn" class="btn btn-danger">Clean Uninstall (remove config)</button>
+                    </div>
                 </div>
             </section>
         </main>

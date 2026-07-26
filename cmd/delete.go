@@ -21,25 +21,28 @@ var deleteCmd = &cobra.Command{
 			return err
 		}
 
-		// Always try to uninstall service (handles non-existent gracefully)
-		if err := srv.Uninstall(name); err != nil {
-			fmt.Printf("warning: could not remove system service for %q: %v\n", name, err)
-		}
-
 		found, err := store.Delete(name)
 		if err != nil {
 			return fmt.Errorf("delete from store: %w", err)
 		}
 
-		if !found {
-			// Check if service existed even though store entry didn't
-			exists, _ := srv.Exists(name)
-			if !exists {
-				return fmt.Errorf("schedule %q not found", name)
-			}
+		exists, _ := srv.Exists(name)
+
+		if !found && !exists {
+			return fmt.Errorf("schedule %q not found", name)
 		}
 
-		fmt.Printf("deleted schedule %q\n", name)
+		if err := srv.Uninstall(name); err != nil {
+			fmt.Printf("warning: could not remove system service for %q: %v\n", name, err)
+		}
+
+		if !found {
+			fmt.Printf("removed orphaned service for %q\n", name)
+		} else if exists {
+			fmt.Printf("deleted schedule %q and uninstalled service\n", name)
+		} else {
+			fmt.Printf("deleted schedule %q\n", name)
+		}
 		return nil
 	},
 }

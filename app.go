@@ -7,14 +7,17 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/BurntSushi/toml"
+	"github.com/ihsan-ramadhan/tuckify/cmd"
 	"github.com/ihsan-ramadhan/tuckify/internal/config"
 	"github.com/ihsan-ramadhan/tuckify/internal/history"
 	"github.com/ihsan-ramadhan/tuckify/internal/organizer"
 	"github.com/ihsan-ramadhan/tuckify/internal/service"
 	"github.com/ihsan-ramadhan/tuckify/internal/store"
+	"github.com/robfig/cron/v3"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -290,16 +293,9 @@ func (a *App) GetSchedules() ([]scheduleView, error) {
 }
 
 func (a *App) SaveSchedule(name string, folders []string, cronExpr string, configPath string, recursive, yes bool) error {
-	folderStr := ""
-	if len(folders) > 0 {
-		folderStr = folders[0]
-		for i := 1; i < len(folders); i++ {
-			folderStr += "," + folders[i]
-		}
-	}
 	return store.Upsert(store.Schedule{
 		Name:      name,
-		Folder:    folderStr,
+		Folders:   folders,
 		Cron:      cronExpr,
 		Config:    configPath,
 		Recursive: recursive,
@@ -467,6 +463,25 @@ func (a *App) ClearHistory() error {
 	return history.ClearAll()
 }
 
+func (a *App) getSystemdLogs(name string, lines int, follow bool) (string, error) {
+	jctl, errJ := exec.LookPath("journalctl")
+	if errJ != nil {
+		return "", fmt.Errorf("journalctl not found: %w", errJ)
+	}
+	args := []string{"--user", "-u", "tuckify-" + name, "-n", fmt.Sprintf("%d", lines), "--no-pager", "-o", "short-monotonic"}
+	if follow {
+		args = append(args, "-f")
+	}
+	ctx, cancel := context.WithTimeout(a.ctx, 5*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, jctl, args...)
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &out
+	_ = cmd.Run()
+	return out.String(), nil
+}
+
 func (a *App) GetLogs(name string, lines int, follow bool) (string, error) {
 	srv, err := service.NewService()
 	if err != nil {
@@ -474,29 +489,29 @@ func (a *App) GetLogs(name string, lines int, follow bool) (string, error) {
 	}
 
 	if _, errSys := exec.LookPath("systemctl"); errSys == nil {
-		jctl, errJ := exec.LookPath("journalctl")
-		if errJ != nil {
-			return "", fmt.Errorf("journalctl not found: %w", errJ)
+		return a.getSystemdLogs(name, lines, follow)
+	}
+
+	appDataDir, err := os.UserConfigDir()
+	if err == nil {
+		logPath := filepath.Join(appDataDir, "tuckify", fmt.Sprintf("tuckify-%s.log", name))
+		if data, errRead := os.ReadFile(logPath); errRead == nil && len(data) > 0 {
+			allLines := strings.Split(strings.ReplaceAll(string(data), "\r\n", "\n"), "\n")
+			if len(allLines) > 0 && allLines[len(allLines)-1] == "" {
+				allLines = allLines[:len(allLines)-1]
+			}
+			if len(allLines) > lines {
+				allLines = allLines[len(allLines)-lines:]
+			}
+			return strings.Join(allLines, "\n"), nil
 		}
-		args := []string{"--user", "-u", "tuckify-" + name, "-n", fmt.Sprintf("%d", lines), "--no-pager", "-o", "short-monotonic"}
-		if follow {
-			args = append(args, "-f")
-		}
-		ctx, cancel := context.WithTimeout(a.ctx, 5*time.Second)
-		defer cancel()
-		cmd := exec.CommandContext(ctx, jctl, args...)
-		var out bytes.Buffer
-		cmd.Stdout = &out
-		cmd.Stderr = &out
-		_ = cmd.Run()
-		return out.String(), nil
 	}
 
 	status, err := srv.CheckStatus()
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("Logs not directly fetchable on this platform.\n%s\n", status), nil
+	return fmt.Sprintf("No log output recorded yet for %q.\nStatus:\n%s", name, status), nil
 }
 
 func (a *App) GetConflictStrategy() (string, error) {
@@ -533,4 +548,15 @@ func (a *App) SaveConflictStrategy(strategy string) error {
 	}
 
 	return os.WriteFile(p, buf.Bytes(), 0644)
+}
+
+func (a *App) ValidateCron(expr string) (string, error) {
+	if _, err := cron.ParseStandard(expr); err != nil {
+		return err.Error(), nil
+	}
+	return "", nil
+}
+
+func (a *App) UninstallApp(keepConfig bool) error {
+	return cmd.RunUninstall(keepConfig)
 }

@@ -122,7 +122,7 @@ func askConflictStrategy(src, dest string) (string, error) {
 	}
 }
 
-func resolveDest(destDir, targetName, conflictStrategy string) (string, error) {
+func resolveDest(src, destDir, targetName, conflictStrategy string) (string, error) {
 	dest := filepath.Join(destDir, targetName)
 	if _, err := os.Stat(dest); os.IsNotExist(err) {
 		return dest, nil
@@ -134,7 +134,7 @@ func resolveDest(destDir, targetName, conflictStrategy string) (string, error) {
 	case "overwrite":
 		return dest, nil
 	case "ask":
-		choice, err := askConflictStrategy(dest, dest)
+		choice, err := askConflictStrategy(src, dest)
 		if err != nil {
 			return "", err
 		}
@@ -174,12 +174,32 @@ func copyFile(src, dest string) (err error) {
 	if err != nil {
 		return err
 	}
-	defer func() { _ = out.Close() }()
 
-	if _, err := io.Copy(out, in); err != nil {
+	defer func() {
+		_ = out.Close()
+		if err != nil {
+			_ = os.Remove(dest)
+		}
+	}()
+
+	if _, err = io.Copy(out, in); err != nil {
 		return err
 	}
 	return nil
+}
+
+// skipDirs lists directory names to skip during recursive walks
+// to avoid traversing cache, version control, and IDE directories.
+var skipDirs = map[string]bool{
+	".git":          true,
+	"node_modules":  true,
+	".cache":        true,
+	"tmp":           true,
+	"__pycache__":   true,
+	".Trash":        true,
+	".DS_Store":     true,
+	".idea":         true,
+	".vscode":       true,
 }
 
 var templateRegex = regexp.MustCompile(`\{([a-zA-Z]+)(?::([a-zA-Z]+))?\}`)
@@ -327,7 +347,7 @@ func buildAndResolveDest(src string, rule *config.Rule, conflictStrategy string,
 		}
 	}
 
-	resolvedDest, err := resolveDest(destDir, targetName, conflictStrategy)
+	resolvedDest, err := resolveDest(src, destDir, targetName, conflictStrategy)
 	return resolvedDest, false, err
 }
 
@@ -373,6 +393,9 @@ func listFiles(folder string, recursive bool) ([]string, error) {
 		if err != nil {
 			return err
 		}
+		if d.IsDir() && skipDirs[d.Name()] {
+			return filepath.SkipDir
+		}
 		if !d.IsDir() {
 			files = append(files, path)
 		}
@@ -386,6 +409,9 @@ func deleteEmptyDirs(root string) error {
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
+		}
+		if d.IsDir() && skipDirs[d.Name()] {
+			return filepath.SkipDir
 		}
 		if d.IsDir() && path != root {
 			dirs = append(dirs, path)
@@ -496,7 +522,3 @@ func Organize(folder string, cfg *config.Config, dryRun bool, recursive bool) ([
 
 	return results, nil
 }
-
-// HistoryWriter is set by cmd layer to persist undo history.
-// ponytail: func var so callers (cmd/run.go) can inject without import cycle.
-var HistoryWriter func(results []Result) error

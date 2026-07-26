@@ -5,8 +5,8 @@ dist/
 go.work
 go.work.sum
 
-# Wails build artifacts
-build/
+# Wails build output
+build/bin/
 
 # Wails generated bindings
 gui/frontend/wailsjs/

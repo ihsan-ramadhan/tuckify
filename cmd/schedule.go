@@ -56,12 +56,11 @@ var scheduleCmd = &cobra.Command{
 			}
 		}
 
-		// Check if schedule already exists
 		existing, err := store.Find(name)
 		if err != nil {
 			return fmt.Errorf("load schedules: %w", err)
 		}
-		if existing != nil && !scheduleForce && !scheduleRun {
+		if existing != nil && !scheduleForce {
 			var response string
 			fmt.Printf("schedule %q already exists — overwrite? [y/N]: ", name)
 			_, err := fmt.Scanln(&response)
@@ -70,13 +69,24 @@ var scheduleCmd = &cobra.Command{
 			}
 		}
 
+		recursive := scheduleRecursive
+		yes := scheduleYes
+		if existing != nil {
+			if !cmd.Flags().Changed("recursive") {
+				recursive = existing.Recursive
+			}
+			if !cmd.Flags().Changed("yes") {
+				yes = existing.Yes
+			}
+		}
+
 		if err := store.Upsert(store.Schedule{
 			Name:      name,
 			Folders:   folders,
 			Cron:      cronExpr,
 			Config:    absConfig,
-			Recursive: scheduleRecursive,
-			Yes:       scheduleYes,
+			Recursive: recursive,
+			Yes:       yes,
 		}); err != nil {
 			return fmt.Errorf("save schedule: %w", err)
 		}
@@ -91,12 +101,10 @@ var scheduleCmd = &cobra.Command{
 		warnNoRules(cfg, actualConfigPath)
 
 		if scheduleRun {
-			// Run interactive scheduler (blocking)
 			return scheduler.Run(name, folders, cronExpr, absConfig)
 		}
 		
 		if scheduleStart {
-			// Start as background service
 			srv, err := service.NewService()
 			if err != nil {
 				return err
@@ -108,7 +116,6 @@ var scheduleCmd = &cobra.Command{
 			return nil
 		}
 		
-		// Only show hint if neither --run nor --start was used
 		fmt.Printf("  run 'tuckify start %s' to activate as a background service\n", name)
 		return nil
 	},
