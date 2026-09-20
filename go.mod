@@ -8,7 +8,7 @@ require (
 	github.com/mattn/go-isatty v0.0.23
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/spf13/cobra v1.10.2
-	github.com/wailsapp/wails/v2 v2.13.0
+	github.com/wailsapp/wails/v2 v2.16.0
 )
 
 require (
